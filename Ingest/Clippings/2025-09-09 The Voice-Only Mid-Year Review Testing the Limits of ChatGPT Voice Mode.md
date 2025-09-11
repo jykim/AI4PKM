@@ -8,6 +8,24 @@ created: 2025-09-09
 tags:
   - "clippings"
 ---
+
+## Summary
+
+Tiago Forte tested ChatGPT's Advanced Voice Mode for conducting his mid-year review while walking, aiming to make the process more dynamic and less time-consuming. The experiment revealed both impressive capabilities and significant limitations:
+
+• **Breakthrough Voice Experience** - ChatGPT's Advanced Voice Mode was "perfectly accurate, fluid, natural, engaging, and even warm" with thoughtful pauses and genuine conversational flow. Unlike previous voice assistants, it maintained accuracy across two hours in a noisy environment with 2-3 second response times that felt human-like.
+
+• **AI Limitations Exposed** - Lack of thoroughness (consistently glossing over details), reluctance to access external sources, excessive sycophancy without genuine coaching insights, and inability to challenge assumptions. The AI had "zero skin in the game" making its advice less trustworthy.
+
+• **Practical Constraints** - Daily 1-hour usage limit interrupted momentum at crucial moments, conversation length limits required starting new chats (losing context), and lack of automatic documentation meant insights were ephemeral unless specifically requested.
+
+• **Human Adaptation Challenges** - Difficulty trusting the AI initially, retaining unnecessary conversational courtesies, and missing the Master Prompt context that enriches interactions. The experience highlighted how voice mode requires different preparation than text-based AI work.
+
+The voice-only approach succeeded in creating a conversational, exercise-friendly format but fell short on thoroughness and depth compared to traditional written reflection methods.
+
+---
+
+## Full Content
 I recently set aside some time to do my mid-year review, a ritual I complete around July each year, and noticed that I felt some resistance to it.
 
 In fact, I realized that I’ve always somewhat resisted it. Since I’m currently writing a book on the subject, I decided to explore why.
