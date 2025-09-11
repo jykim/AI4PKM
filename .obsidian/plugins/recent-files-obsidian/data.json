@@ -1,6 +1,10 @@
 {
   "recentFiles": [
     {
+      "basename": "2025-09-10 일지",
+      "path": "Ingest/Clippings/2025-09-10 일지.md"
+    },
+    {
       "basename": "2025-09-09 CTP - Second Brain by Gemini",
       "path": "AI/Sharable/2025-09-09 CTP - Second Brain by Gemini.md"
     },
@@ -195,10 +199,6 @@
     {
       "basename": "PKM Automations",
       "path": "_Settings_/Guidelines/PKM Automations.md"
-    },
-    {
-      "basename": "2025-08-31 “직무간 경계 희미해지고, 중간관리자 역할 줄고 있죠” (김민송 마이크로소프트",
-      "path": "Ingest/Clippings/2025-08-31 “직무간 경계 희미해지고, 중간관리자 역할 줄고 있죠” (김민송 마이크로소프트.md"
     }
   ],
   "omittedPaths": [],

@@ -8,17 +8,17 @@
         "type": "tabs",
         "children": [
           {
-            "id": "5ccc5f9ecf40208d",
+            "id": "69310ced20a07dab",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Ingest/Clippings/진격의 거인.md",
+                "file": "Ingest/Clippings/2025/09/2025-09-11 진격의 거인.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "진격의 거인"
+              "title": "2025-09-11 진격의 거인"
             }
           }
         ]
@@ -180,13 +180,27 @@
       "obsidian-excalidraw-plugin:New drawing": false,
       "obsidian-importer:Open Importer": false,
       "obsidian-git:Open Git source control": false,
-      "janitor:Janitor: scan vault": false
+      "janitor:Janitor: scan vault": false,
+      "limitless-lifelogs:Sync Limitless Lifelogs": false
     }
   },
-  "active": "5ccc5f9ecf40208d",
+  "active": "69310ced20a07dab",
   "lastOpenFiles": [
-    "Ingest/Limitless/2025-09-10.md",
+    "Ingest/Clippings/2025-09-10 일지.md",
+    "Ingest/Clippings/2025/09/2025-09-11 진격의 거인.md",
+    "Ingest/Clippings/2025/09",
+    "Ingest/Clippings/2025",
     "Ingest/Limitless/2025-09-09.md",
+    "Ingest/Limitless/2025-09-11.md",
+    "Ingest/Limitless/2025-09-10.md",
+    "Limitless Lifelogs/2025-09-10-from-obsidian-plugin.md",
+    "Ingest/Limitless/2025-09-10-from-api.md",
+    "Limitless Lifelogs/2025-09-10.md",
+    "Pasted image 20250910221617.png",
+    "Limitless Lifelogs",
+    "Ingest/Clippings/2025-09-09 추상화는 아이디어를 결합하는 열쇠다.md",
+    "Ingest/Clippings/2025-09-09 제텔카스텐의 네 가지 기본 원칙.md",
+    "Ingest/Clippings/진격의 거인.md",
     "Ingest/Limitless/2025-09-08.md",
     "Ingest/Limitless/2025-09-07.md",
     "Ingest/Limitless/2025-09-06.md",
@@ -197,7 +211,6 @@
     "Ingest/Limitless/Limitless.md",
     "Ingest/Limitless",
     "Journal/2025-09-10.md",
-    "Ingest/Clippings/진격의 거인.md",
     "Ingest/Clippings/AI4PKM/Ingest/Clippings/진격의 거인.md",
     "Ingest/Clippings/AI4PKM/Ingest/Clippings",
     "Ingest/Clippings/AI4PKM/Ingest",
@@ -208,19 +221,8 @@
     "AI/Sharable/2025-09-09 CTP - Second Brain by Gemini.md",
     "AI/Research/2025-09-09 ARP - Zettelkasten vs Second Brain Integration.md",
     "_Settings_/Logs/ai4pkm_2025-09-10.log",
-    "_Settings_/ai4pkm_config.json",
-    "ai4pkm_cli/agents/__pycache__/codex_agent.cpython-312.pyc",
-    "ai4pkm_cli/agents/__pycache__/gemini_agent.cpython-312.pyc",
     "Ingest/Clippings/2025-09-09 Building a Second Brain The Definitive Introductory Guide.md",
     "Ingest/Clippings/2025-09-09 Building a Second Brain The Definitive Introductory Guide - EIC by Gemini.md",
-    "Ingest/Clippings/2025-09-09 두 번째 뇌(Second Brain)란 무엇인가?.md",
-    "AI/Roundup/2025-09-09 Roundup - Gemini.md",
-    "_Settings_/Workflows/Daily Ingestion and Roundup (DIR).md",
-    "Topics/Zettelkasten.md",
-    "Topics/Personal Knowledge Management (PKM).md",
-    "Topics/Tiago Forte.md",
-    "_Settings_/Guidelines/PKM Guidelines.md",
-    "_Settings_/Prompts/Ad-hoc Research within PKM (ARP).md",
     "_Settings_/Prompts/_files_/Daily Roundup 2025-07-20 17.29.29.excalidraw.svg",
     "_Settings_/Prompts/_files_/Family Conversation Analysis (FCA) 2025-08-30 13.27.40.excalidraw.svg",
     "_Settings_/Guidelines/_files_/PKM Writing Workflow.excalidraw.svg",

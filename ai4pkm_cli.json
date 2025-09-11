@@ -1,5 +1,5 @@
 {
-  "default-agent": "claude_code",
+  "default-agent": "gemini_cli",
   "agents-config": {
     "claude_code": {
       "permission_mode": "bypassPermissions"
@@ -17,13 +17,13 @@
       "cron": "0 * * * *",
       "description": "Regularly run tasks for keeping knowledge base clean every hour",
       "agent": "claude_code",
-      "enabled": true
+      "enabled": false
     },
     {
       "inline_prompt": "SLD sync missing dates and process with PLL",
       "cron": "0 20 * * *",
       "description": "Sync missing Limitless data and process life logs at 8 PM daily",
-      "enabled": false
+      "enabled": true
     },
     {
       "inline_prompt": "DIR for today",
