@@ -11,10 +11,14 @@
             "id": "5ccc5f9ecf40208d",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "Ingest/Clippings/진격의 거인.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "진격의 거인"
             }
           }
         ]
@@ -150,8 +154,8 @@
             "state": {
               "type": "calendar",
               "state": {},
-              "icon": "calendar-with-checkmark",
-              "title": "Calendar"
+              "icon": "lucide-ghost",
+              "title": "calendar"
             }
           }
         ],
@@ -179,8 +183,24 @@
       "janitor:Janitor: scan vault": false
     }
   },
-  "active": "d454ff3669b1e122",
+  "active": "5ccc5f9ecf40208d",
   "lastOpenFiles": [
+    "Ingest/Limitless/2025-09-10.md",
+    "Ingest/Limitless/2025-09-09.md",
+    "Ingest/Limitless/2025-09-08.md",
+    "Ingest/Limitless/2025-09-07.md",
+    "Ingest/Limitless/2025-09-06.md",
+    "Ingest/Limitless/2025-09-05.md",
+    "Ingest/Limitless/2025-09-04.md",
+    "_Settings_/Prompts/Sync Limitless Data (SLD).md",
+    "limitless_sync.py",
+    "Ingest/Limitless/Limitless.md",
+    "Ingest/Limitless",
+    "Journal/2025-09-10.md",
+    "Ingest/Clippings/진격의 거인.md",
+    "Ingest/Clippings/AI4PKM/Ingest/Clippings/진격의 거인.md",
+    "Ingest/Clippings/AI4PKM/Ingest/Clippings",
+    "Ingest/Clippings/AI4PKM/Ingest",
     "ai4pkm_cli.json",
     "ai4pkm_config.json",
     "Topics/Second Brain.md",
@@ -191,11 +211,6 @@
     "_Settings_/ai4pkm_config.json",
     "ai4pkm_cli/agents/__pycache__/codex_agent.cpython-312.pyc",
     "ai4pkm_cli/agents/__pycache__/gemini_agent.cpython-312.pyc",
-    "ai4pkm_cli/agents/__pycache__/claude_agent.cpython-312.pyc",
-    "ai4pkm_cli/agents/__pycache__/base_agent.cpython-312.pyc",
-    "ai4pkm_cli/agents/__pycache__/__init__.cpython-312.pyc",
-    "ai4pkm_cli/agents/__pycache__",
-    "ai4pkm_cli/__pycache__/agent_factory.cpython-312.pyc",
     "Ingest/Clippings/2025-09-09 Building a Second Brain The Definitive Introductory Guide.md",
     "Ingest/Clippings/2025-09-09 Building a Second Brain The Definitive Introductory Guide - EIC by Gemini.md",
     "Ingest/Clippings/2025-09-09 두 번째 뇌(Second Brain)란 무엇인가?.md",
@@ -206,17 +221,6 @@
     "Topics/Tiago Forte.md",
     "_Settings_/Guidelines/PKM Guidelines.md",
     "_Settings_/Prompts/Ad-hoc Research within PKM (ARP).md",
-    "_Settings_/Prompts/Daily Roundup 2025-07-20 17.29.29.excalidraw.md",
-    "_Settings_/Prompts/Family Conversation Analysis (FCA) 2025-08-30 13.27.40.excalidraw.md",
-    "_Settings_/Prompts/Create Thread Postings (CTP).md",
-    "_Settings_/Prompts/Generate Daily Roundup (GDR).md",
-    "Topics/Obsidian.md",
-    "Ingest/Clippings/2025-09-09 두 번째 뇌 방식을 활용한 영어 공부법.md",
-    "Ingest/Clippings/2025-09-09 추상화는 아이디어를 결합하는 열쇠다.md",
-    "Ingest/Clippings/2025-09-09 제텔카스텐의 네 가지 기본 원칙.md",
-    "Topics/PARA Method.md",
-    "Topics/CODE Methodology.md",
-    "README.md",
     "_Settings_/Prompts/_files_/Daily Roundup 2025-07-20 17.29.29.excalidraw.svg",
     "_Settings_/Prompts/_files_/Family Conversation Analysis (FCA) 2025-08-30 13.27.40.excalidraw.svg",
     "_Settings_/Guidelines/_files_/PKM Writing Workflow.excalidraw.svg",

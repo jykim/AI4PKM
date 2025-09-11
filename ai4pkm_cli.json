@@ -20,6 +20,12 @@
       "enabled": true
     },
     {
+      "inline_prompt": "SLD sync missing dates and process with PLL",
+      "cron": "0 20 * * *",
+      "description": "Sync missing Limitless data and process life logs at 8 PM daily",
+      "enabled": false
+    },
+    {
       "inline_prompt": "DIR for today",
       "cron": "0 21 * * *",
       "description": "Daily ingestion and processing of contents into daily roundup at 9 PM",
