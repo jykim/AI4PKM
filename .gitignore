@@ -16,3 +16,11 @@ __pycache__
 # Environment variables
 .env
 .env.local
+
+# Ignore all personal data folders inside Ingest
+/Ingest/Clippings/
+/Ingest/Limitless/
+
+# Ignore Obsidian's cache and state files
+/.obsidian/workspace.json
+/.obsidian/plugins/recent-files-obsidian/data.json
