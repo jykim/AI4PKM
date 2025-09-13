@@ -33,7 +33,8 @@ class ProcessPhotos:
 
         try:
             subprocess.run(
-                ["osascript", "_Settings_/Tools/export_photos.applescript"], check=True
+                ["osascript", "ai4pkm_cli/scripts/export_photos.applescript"],
+                check=True,
             )
         except Exception as e:
             self.logger.error(f"Error exporting photos: {e}")
