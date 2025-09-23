@@ -117,7 +117,7 @@ class PKMApp:
             try:
                 # Create a temporary config without saving to disk
                 temp_config = Config()
-                temp_config.config['agent'] = agent_override  # Modify in memory only
+                temp_config.config['default-agent'] = agent_override  # Modify in memory only
                 execution_agent = AgentFactory.create_agent(self.logger, temp_config)
                 self.logger.info(f"🤖 Using {execution_agent.get_agent_name()} for this prompt execution")
             except Exception as e:

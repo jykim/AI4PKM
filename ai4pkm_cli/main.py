@@ -19,7 +19,7 @@ def signal_handler(sig, frame):
 @click.option('-t', '--test', 'test_cron', is_flag=True, help='Test a specific cron job interactively')
 @click.option('-c', '--cron', 'run_cron', is_flag=True, help='Run continuous cron job scheduler')
 @click.option('-a', '--agent', help='Override agent for prompt execution (c/claude, g/gemini, o/codex) - only usable with -p')
-@click.option('-d', '--debug', is_flag=True, help='Enable debug logging')
+@click.option('-d', '--debug', is_flag=True, help='Enable debug logging (shows shell commands for CLI agents)')
 @click.option('--list-agents', is_flag=True, help='List available AI agents and their status')
 @click.option('--show-config', is_flag=True, help='Show current configuration')
 def main(prompt, command, test_cron, run_cron, agent, debug, list_agents, show_config):

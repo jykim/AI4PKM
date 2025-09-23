@@ -12,13 +12,16 @@ class Config:
         "default-agent": "claude_code",  # Options: claude_code, gemini_cli, codex_cli
         "agents-config": {
             "claude_code": {
-                "permission_mode": "bypassPermissions"
+                "permission_mode": "bypassPermissions",
+                "global_prompt": ""
             },
             "gemini_cli": {
-                "command": "gemini"  # CLI command name
+                "command": "gemini",  # CLI command name
+                "global_prompt": ""
             },
             "codex_cli": {
-                "command": "codex"  # CLI command name
+                "command": "codex",  # CLI command name
+                "global_prompt": ""
             }
         },
         "photo_processing": {
@@ -152,3 +155,9 @@ class Config:
     def get_notes_days(self) -> int:
         """Get number of days to look back for notes."""
         return self.get('notes_processing.days', 7)
+    
+    def get_global_prompt(self, agent: str = None) -> str:
+        """Get global prompt for specific agent."""
+        if agent is None:
+            agent = self.get_agent()
+        return self.get(f'agents-config.{agent}.global_prompt', '')

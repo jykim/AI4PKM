@@ -192,54 +192,104 @@ The system automatically falls back to available agents if the selected one is n
 
 ## ⚙️ Configuration
 
-### AI Agent Configuration (`_Settings_/ai4pkm_config.json`)
+### AI Agent Configuration (`ai4pkm_cli.json`)
 
 The CLI automatically creates a configuration file to manage AI agent settings:
 
 ```json
 {
-  "agent": "claude_code",
-  "claude_code": {
-    "permission_mode": "bypassPermissions"
+  "default-agent": "claude_code",
+  "agents-config": {
+    "claude_code": {
+      "permission_mode": "bypassPermissions",
+      "global_prompt": "You are an AI assistant for knowledge management. Always be concise and actionable."
+    },
+    "gemini_cli": {
+      "command": "gemini",
+      "global_prompt": "Focus on multilingual support and cultural context."
+    },
+    "codex_cli": {
+      "command": "codex",
+      "global_prompt": "Find the abbreviation in the list of prompts."
+    }
   },
-  "gemini_cli": {
-    "command": "gemini"
+  "photo_processing": {
+    "source_folder": "Ingest/Photolog/Original/",
+    "destination_folder": "Ingest/Photolog/Processed/",
+    "albums": ["AI4PKM"],
+    "days": 1
   },
-  "codex_cli": {
-    "command": "codex"
-  }
+  "notes_processing": {
+    "destination_folder": "Ingest/Apple Notes/",
+    "days": 7
+  },
+  "cron_jobs": [...]
 }
 ```
 
 **Configuration Options:**
-- `agent`: Current active agent (claude_code, gemini_cli, codex_cli)  
+- `default-agent`: Current active agent (claude_code, gemini_cli, codex_cli)  
+- `agents-config`: Configuration section for all agents
+- `global_prompt`: Agent-specific prompt that gets prepended to all user prompts
 - Each agent section contains agent-specific settings
 - CLI commands can be customized for different installations
 - CLI-based agents (Gemini, Codex) use their respective default models
 
-### Cron Jobs (`cron.json`)
+**Global Prompt Feature:**
+- Each agent can have its own `global_prompt` that automatically gets prepended to every user prompt
+- Useful for setting agent personality, language preferences, or specialized instructions
+- Empty global prompts are ignored (backward compatible)
+- Global prompts are applied before template parameters and context
 
-Define scheduled tasks in the root `cron.json` file:
+### Cron Jobs (in `ai4pkm_cli.json`)
+
+Define scheduled tasks in the `cron_jobs` array within the main configuration file:
 
 ```json
-[
-  {
-    "inline_prompt": "CKU for hourly run",
-    "cron": "0 * * * *",
-    "description": "Regularly run tasks for keeping knowledge base clean every hour"
-  },
-  {
-    "inline_prompt": "DIR for today", 
-    "cron": "0 21 * * *",
-    "description": "Daily ingestion and processing of contents into daily roundup at 9 PM"
-  },
-  {
-    "inline_prompt": "WRP for this week",
-    "cron": "0 12 * * 0", 
-    "description": "Weekly review of knowledge base every Sunday at 12 PM"
-  }
-]
+{
+  "cron_jobs": [
+    {
+      "inline_prompt": "CKU for hourly run",
+      "cron": "0 * * * *",
+      "description": "Regularly run tasks for keeping knowledge base clean every hour",
+      "agent": "claude_code",
+      "enabled": false
+    },
+    {
+      "inline_prompt": "DIR for today", 
+      "cron": "0 21 * * *",
+      "description": "Daily ingestion and processing of contents into daily roundup at 9 PM",
+      "enabled": true
+    },
+    {
+      "inline_prompt": "WRP for this week",
+      "cron": "0 12 * * 0", 
+      "description": "Weekly review of knowledge base every Sunday at 12 PM",
+      "enabled": true
+    },
+    {
+      "command": "process_photos",
+      "cron": "0 * * * *",
+      "description": "Regularly sync and process photos from iCloud",
+      "enabled": true
+    },
+    {
+      "command": "process_notes",
+      "cron": "15 * * * *",
+      "description": "Regularly sync and process notes from Apple Notes",
+      "enabled": true
+    }
+  ]
+}
 ```
+
+**Cron Job Options:**
+- `inline_prompt`: Direct prompt text to execute
+- `command`: Pre-defined command to run (e.g., "process_photos", "process_notes")
+- `cron`: Cron expression for scheduling
+- `description`: Human-readable description
+- `agent`: Specific agent to use (optional, defaults to global agent)
+- `enabled`: Whether the job is active (true/false)
 
 **Cron Expression Format:**
 - `* * * * *` = minute hour day month weekday
@@ -311,9 +361,10 @@ Time range: {start_time} to {end_time}
    - Install: `pip install claude-code-sdk`
    - Verify API credentials
 
-2. **"No cron.json found"**
-   - Create `cron.json` in the project root
-   - Use the example format above
+2. **"Configuration file issues"**
+   - Configuration is now in `ai4pkm_cli.json` (not separate cron.json)
+   - The CLI automatically creates this file if it doesn't exist
+   - If migrating from old format, update to new structure
 
 3. **"Prompt file not found"**
    - Check `_Settings_/Prompts/` directory
@@ -331,7 +382,7 @@ Time range: {start_time} to {end_time}
    - System automatically falls back to available agents
 
 6. **Agent switching not working**
-   - Check `_Settings_/ai4pkm_config.json` permissions
+   - Check `ai4pkm_cli.json` permissions
    - Verify agent type spelling (claude_code, gemini_cli, codex_cli)
    - Use shortcuts: `-a c/claude`, `-a g/gemini`, `-a o/codex`
    - Use `--show-config` to verify current settings
@@ -346,17 +397,20 @@ For detailed debugging, check the logs in `_Settings_/Logs/` or run with verbose
 ### Daily Knowledge Management
 
 ```bash
-# Set up daily roundup at 9 PM
-echo '[{"inline_prompt": "DIR for today", "cron": "0 21 * * *", "description": "Daily roundup"}]' > cron.json
+# Configuration is stored in ai4pkm_cli.json
+# The CLI automatically creates and manages this file
 
 # Check the configuration
 ai4pkm
 
-# Start the scheduler
+# Start the scheduler (runs enabled cron jobs)
 ai4pkm -c
 
-# Test the job manually
+# Test a specific job manually
 ai4pkm -t
+
+# You can also run prompts directly
+ai4pkm -p "DIR for today"
 ```
 
 ### Custom Prompt Execution
@@ -365,14 +419,18 @@ ai4pkm -t
 # Ask questions directly
 ai4pkm -p "What are the benefits of using a PKM system?"
 
-# Get code help
+# Get code help (with agent-specific global prompt)
 ai4pkm -a codex -p "Write a Python script to parse JSON files"
 
-# Content analysis
+# Content analysis (leveraging Claude's global prompt)
 ai4pkm -a claude -p "Summarize the key points of this text: [your text]"
 
 # Creative writing
 ai4pkm -p "Write a brief introduction to knowledge management"
+
+# Global prompts are automatically prepended to all prompts
+# For example, if Claude has global_prompt: "Always respond in Korean",
+# then "Hello" becomes "Always respond in Korean\n\nHello"
 ```
 
 ### Agent Management

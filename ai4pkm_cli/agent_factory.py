@@ -34,6 +34,11 @@ class AgentFactory:
         agent_type = config.get_agent()
         agent_config = config.get_agent_config(agent_type)
         
+        # Add global prompt to agent config
+        global_prompt = config.get_global_prompt(agent_type)
+        if global_prompt:
+            agent_config['global_prompt'] = global_prompt
+        
         if agent_type not in cls.AGENT_CLASSES:
             raise ValueError(f"Unknown agent type: {agent_type}. Available: {list(cls.AGENT_CLASSES.keys())}")
             
@@ -61,6 +66,12 @@ class AgentFactory:
                 
             try:
                 agent_config = config.get_agent_config(agent_type)
+                
+                # Add global prompt to agent config
+                global_prompt = config.get_global_prompt(agent_type)
+                if global_prompt:
+                    agent_config['global_prompt'] = global_prompt
+                
                 agent_class = cls.AGENT_CLASSES[agent_type]
                 agent = agent_class(logger, agent_config)
                 
@@ -76,6 +87,12 @@ class AgentFactory:
         # (it may have a fallback mode)
         logger.warning("No available agents found, using original agent with potential fallback mode")
         agent_config = config.get_agent_config(exclude)
+        
+        # Add global prompt to agent config
+        global_prompt = config.get_global_prompt(exclude)
+        if global_prompt:
+            agent_config['global_prompt'] = global_prompt
+        
         agent_class = cls.AGENT_CLASSES[exclude]
         return agent_class(logger, agent_config)
         

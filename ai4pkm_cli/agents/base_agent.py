@@ -85,6 +85,11 @@ class BaseAgent(ABC):
         # Replace template parameters
         if params:
             prompt_content = self._replace_template_params(prompt_content, params)
+        
+        # Prepend global prompt if available
+        global_prompt = self.config.get('global_prompt', '')
+        if global_prompt.strip():
+            prompt_content = f"{global_prompt.strip()}\n\n{prompt_content}"
             
         # Add context if provided
         if context:

@@ -2,13 +2,16 @@
   "default-agent": "claude_code",
   "agents-config": {
     "claude_code": {
-      "permission_mode": "bypassPermissions"
+      "permission_mode": "bypassPermissions",
+      "global_prompt": ""
     },
     "gemini_cli": {
-      "command": "gemini"
+      "command": "gemini",
+      "global_prompt": ""
     },
     "codex_cli": {
-      "command": "codex"
+      "command": "codex",
+      "global_prompt": ""
     }
   },
   "limitless_sync": {
