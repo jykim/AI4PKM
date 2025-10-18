@@ -197,7 +197,7 @@ class FileWatchdogHandler(FileSystemEventHandler):
                 return handler
         return None
     
-    def _process_with_handler(self, event, event_type: str):
+    def _process_with_handler(self, file_path: str, event_type: str):
         """
         Process an event using pattern-based handlers.
         
@@ -205,18 +205,12 @@ class FileWatchdogHandler(FileSystemEventHandler):
             event: FileSystemEvent object
             event_type: Type of event ('created' or 'modified')
         """
-        if event.is_directory:
-            return
-            
-        file_path = event.src_path
-        
         # Check if file is excluded
         if self._is_excluded(file_path):
             return
         
         # Find matching handler
         handler = self._find_matching_handler(file_path)
-        
         if handler:
             try:
                 handler.process(file_path, event_type)
@@ -230,7 +224,11 @@ class FileWatchdogHandler(FileSystemEventHandler):
         Args:
             event (FileSystemEvent): Event representing file/directory modification.
         """
-        self._process_with_handler(event, 'modified')
+        
+        if event.is_directory:
+            return
+            
+        self._process_with_handler(event.src_path, 'modified')
 
     def on_created(self, event):
         """
@@ -239,4 +237,19 @@ class FileWatchdogHandler(FileSystemEventHandler):
         Args:
             event (FileSystemEvent): Event representing file/directory creation.
         """
-        self._process_with_handler(event, 'created')
+        if event.is_directory:
+            return
+            
+        self._process_with_handler(event.src_path, 'created')
+
+    def on_moved(self, event):
+        """
+        Called when a file or directory is moved.
+
+        Args:
+            event (FileSystemEvent): Event representing file/directory movement.
+        """
+        if event.is_directory:
+            return
+            
+        self._process_with_handler(event.dest_path, 'created')

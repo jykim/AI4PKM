@@ -24,3 +24,7 @@ workspace.json
 # Environment variables
 .env
 .env.local
+
+Agents/**/Requests/*.*
+Agents/**/InProgress/*.*
+Agents/**/Completed/*.*

@@ -4,6 +4,7 @@ import os
 import time
 import glob
 from datetime import datetime
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -289,6 +290,49 @@ class PKMApp:
                 f"\n[red]✗ Test error after {execution_time:.2f}s: {e}[/red]"
             )
 
+    def _discover_agent_folders(self):
+        """
+        Discover all agent folders under Agents/ directory recursively.
+        
+        Returns:
+            List of tuples (pattern, handler_class) for each discovered agent
+        """
+        from .watchdog.handlers.generic_agent_handler import GenericAgentHandler
+        
+        agents_base_dir = os.path.join(os.getcwd(), "Agents")
+        agent_handlers = []
+        
+        if not os.path.exists(agents_base_dir):
+            return agent_handlers
+        
+        # Walk through all subdirectories recursively
+        for root, dirs, files in os.walk(agents_base_dir):
+            # Check if AGENT.md or agent.py exists in this directory
+            has_agent_md = "AGENT.md" in files
+            has_agent_py = "agent.py" in files
+            
+            if has_agent_md or has_agent_py:
+                # Get relative path from workspace root
+                rel_path = os.path.relpath(root, os.getcwd())
+                
+                # Create a pattern for JSON files in this agent's Requests folder
+                pattern = f"{rel_path}/Requests/*.json"
+                
+                # Create a closure to capture the agent folder path
+                def make_handler_class(agent_path):
+                    class DynamicAgentHandler(GenericAgentHandler):
+                        def __init__(self, logger=None, workspace_path=None):
+                            super().__init__(agent_path, logger, workspace_path)
+                    return DynamicAgentHandler
+                
+                handler_class = make_handler_class(rel_path)
+                agent_handlers.append((pattern, handler_class))
+                
+                agent_name = os.path.basename(root)
+                self.logger.info(f"📂 Registered agent: {agent_name} (pattern: {pattern})")
+        
+        return agent_handlers
+
     def run_continuous(self):
         """Run continuously with cron jobs, log display, and web API server."""
         self.running = True
@@ -307,14 +351,28 @@ class PKMApp:
         from .watchdog.handlers.clipping_file_handler import ClippingFileHandler
         from .watchdog.handlers.hashtag_file_handler import HashtagFileHandler
         from .watchdog.handlers.markdown_file_handler import MarkdownFileHandler
+        
+        # Discover and register agent folders
+        agent_handlers = self._discover_agent_folders()
+        
+        # Build pattern_handlers list with agents first, then specific handlers, then generic handlers
+        pattern_handlers = [
+            ('AI/Tasks/Requests/*/*.json', TaskRequestFileHandler),
+            ('Ingest/Gobi/*.md', GobiFileHandler),
+            ('Ingest/Limitless/*.md', LimitlessFileHandler),
+            ('Ingest/Clippings/*.md', ClippingFileHandler),
+        ]
+        
+        # Add discovered agent handlers
+        pattern_handlers.extend(agent_handlers)
+        
+        # Add generic handlers last (catch-all patterns)
+        pattern_handlers.extend([
+            ('*.md', HashtagFileHandler),
+        ])
+        
         event_handler = FileWatchdogHandler(
-            pattern_handlers=[
-                ('AI/Tasks/Requests/*/*.json', TaskRequestFileHandler),
-                ('Ingest/Gobi/*.md', GobiFileHandler),
-                ('Ingest/Limitless/*.md', LimitlessFileHandler),
-                ('Ingest/Clippings/*.md', ClippingFileHandler),
-                ('*.md', HashtagFileHandler),
-            ],
+            pattern_handlers=pattern_handlers,
             excluded_patterns=[
                 '.git',
                 'ai4pkm_cli',
