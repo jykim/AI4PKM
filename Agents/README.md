@@ -115,6 +115,7 @@ Agents/YourAgent/
 See existing agents:
 - **EmailSender** - Python handler that sends emails via Gmail
 - **HelloWorld** - AI-driven agent for simple demonstrations
+- **Scheduler** - Python handler that schedules one-time requests for other agents
 
 ## Framework AGENT.md
 
