@@ -109,7 +109,6 @@ def process(request, logger, workspace_path):
         
         # Return response
         if success:
-            logger.info(f"✅ Email sent successfully")
             return {
                 "status": "sent",
                 "to": to,

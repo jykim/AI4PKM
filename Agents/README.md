@@ -13,13 +13,16 @@ The CLI automatically discovers any folder under `Agents/` (at any depth) that c
 When a `.yaml` file is created in an agent's `Requests/` folder:
 
 ```
-Requests/*.yaml → [Processing] → Completed/*.yaml (with response/error)
+Requests/*.yaml → InProgress/*.yaml → [Processing] → Completed/*.yaml
 ```
 
 1. **Requests/** - YAML file placed here triggers the agent
-2. **Processing** - Agent processes the request
-3. **Completed/** - Result saved with request/response or request/error pair
-4. **Original file** - Removed from Requests/ after processing
+2. **InProgress/** - File moved here immediately (prevents data loss)
+3. **Processing** - Agent processes the request
+4. **Completed/** - Result saved with request/response or request/error pair
+5. **Cleanup** - File removed from InProgress/
+
+**Data Safety**: If system crashes, the file remains in InProgress/ and can be reprocessed.
 
 ###Processing Methods
 
@@ -95,15 +98,17 @@ Agents/YourAgent/
 ├── AGENT.md or agent.py    # Handler (choose one)
 ├── README.md                # Agent documentation
 ├── Requests/                # Put *.yaml files here to trigger
+├── InProgress/              # Processing files (auto-created)
 └── Completed/               # Results saved here (auto-created)
 ```
 
 ## Important Rules
 
 1. **✅ YAML files only** - Only `.yaml` files in `Requests/` trigger agents
-2. **✅ Auto-cleanup** - Original request files are removed after processing
+2. **✅ Auto-cleanup** - Files moved through InProgress/ then removed after saving to Completed/
 3. **✅ Complete audit trail** - Every request gets a response or error in Completed/
-4. **🎯 One handler** - Use either `AGENT.md` OR `agent.py`, not both
+4. **✅ Data safety** - InProgress/ prevents data loss if system crashes
+5. **🎯 One handler** - Use either `AGENT.md` OR `agent.py`, not both
 
 ## Examples
 

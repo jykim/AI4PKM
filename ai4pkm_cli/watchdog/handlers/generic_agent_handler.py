@@ -177,9 +177,23 @@ class GenericAgentHandler(BaseFileHandler):
         base_name = os.path.splitext(original_filename)[0]
         result_path = os.path.join(completed_dir, f"{timestamp}_{base_name}.yaml")
         
-        # Save to YAML
+        # Custom representer for multiline strings
+        def represent_str(dumper, data):
+            if '\n' in data:
+                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+            return dumper.represent_scalar('tag:yaml.org,2002:str', data)
+        
+        # Custom representer for long strings without newlines
+        def represent_long_str(dumper, data):
+            if len(data) > 80 and '\n' not in data:
+                return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='>')
+            return represent_str(dumper, data)
+        
+        # Add custom representer for all strings
+        yaml.add_representer(str, represent_str)
+        
         with open(result_path, 'w', encoding='utf-8') as f:
-            yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
+            yaml.dump(result, f, default_flow_style=False, allow_unicode=True, sort_keys=False, width=1000)
         
         status = "error" if is_error else "completed"
         self.logger.info(f"📦 Saved {status} to: {result_path}")
@@ -201,8 +215,6 @@ class GenericAgentHandler(BaseFileHandler):
             file_path: Path to the file that triggered the event
             event_type: Type of event ('created' or 'modified')
         """
-        self.logger.info(f"[{self.agent_name}] Processing {event_type} event for: {file_path}")
-        
         # Check if the trigger file still exists
         import os
         if not os.path.exists(file_path):
@@ -214,34 +226,41 @@ class GenericAgentHandler(BaseFileHandler):
             self.logger.debug(f"[{self.agent_name}] Ignoring file in {file_path}")
             return
         
+        self.logger.info(f"[{self.agent_name}] Processing {event_type} event for: {file_path}")
+        
         original_filename = os.path.basename(file_path)
+        in_progress_path = None
         
         try:
-            # Step 1: Read and parse YAML content
+            # Step 1: Move to InProgress folder FIRST (atomic operation, prevents data loss)
+            in_progress_path = self._move_to_folder(file_path, 'InProgress')
+            
+            # Step 2: Read and parse YAML content from InProgress
             request_data = {}
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(in_progress_path, 'r', encoding='utf-8') as f:
                     request_data = yaml.safe_load(f)
             except Exception as e:
-                error_msg = f"Failed to parse YAML from {file_path}: {e}"
+                error_msg = f"Failed to parse YAML from {in_progress_path}: {e}"
                 self.logger.error(error_msg)
                 self._save_to_completed(request_data or {}, error_msg, True, original_filename)
-                os.remove(file_path)
+                if os.path.exists(in_progress_path):
+                    os.remove(in_progress_path)
                 return
             
-            # Step 2: Read prompts from AGENT.md
+            # Step 3: Read prompts from AGENT.md
             prompts = self._read_agent_prompts()
             
-            # Step 3: Process based on what's available
+            # Step 4: Process based on what's available
             response_or_error = None
             is_error = False
             
             # AGENT.md takes precedence - if it exists, use AI agent with prompts
             if prompts:
-                response_or_error, is_error = self._execute_prompts(file_path, prompts, request_data)
+                response_or_error, is_error = self._execute_prompts(in_progress_path, prompts, request_data)
             # If no AGENT.md, try to call agent.py
             elif os.path.exists(self.agent_py_path):
-                success, result = self._call_agent_py(file_path, request_data)
+                success, result = self._call_agent_py(in_progress_path, request_data)
                 is_error = not success
                 response_or_error = result
             else:
@@ -251,11 +270,12 @@ class GenericAgentHandler(BaseFileHandler):
                 response_or_error = error_msg
                 is_error = True
             
-            # Step 4: Save to Completed with request/response or request/error
+            # Step 5: Save to Completed with request/response or request/error
             self._save_to_completed(request_data, response_or_error, is_error, original_filename)
             
-            # Step 5: Remove original file from Requests
-            os.remove(file_path)
+            # Step 6: Remove file from InProgress (now safely in Completed)
+            if in_progress_path and os.path.exists(in_progress_path):
+                os.remove(in_progress_path)
                 
         except Exception as e:
             error_msg = f"Error processing file {file_path}: {e}"
@@ -263,10 +283,11 @@ class GenericAgentHandler(BaseFileHandler):
             # Save error to Completed
             try:
                 self._save_to_completed(request_data if 'request_data' in locals() else {}, error_msg, True, original_filename)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except:
-                pass
+                # Clean up InProgress file
+                if in_progress_path and os.path.exists(in_progress_path):
+                    os.remove(in_progress_path)
+            except Exception as cleanup_error:
+                self.logger.error(f"Error during cleanup: {cleanup_error}")
     
     def _execute_prompts(self, file_path: str, prompts: str, request_data: dict) -> tuple[any, bool]:
         """

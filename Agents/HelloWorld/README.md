@@ -21,10 +21,11 @@ EOF
 ```
 
 The agent will:
-1. Detect YAML file
-2. Process with AI (framework prompts + agent prompts + YAML content)
-3. Save AI response to Completed/
-4. Remove original file from Requests/
+1. Detect YAML file in Requests/
+2. Move to InProgress/
+3. Process with AI (framework prompts + agent prompts + YAML content)
+4. Save AI response to Completed/
+5. Remove file from InProgress/
 
 ## Example Result
 
