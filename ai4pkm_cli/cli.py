@@ -307,6 +307,10 @@ class PKMApp:
         
         # Walk through all subdirectories recursively
         for root, dirs, files in os.walk(agents_base_dir):
+            # Skip the root Agents/ folder itself
+            if root == agents_base_dir:
+                continue
+            
             # Check if AGENT.md or agent.py exists in this directory
             has_agent_md = "AGENT.md" in files
             has_agent_py = "agent.py" in files
@@ -315,8 +319,8 @@ class PKMApp:
                 # Get relative path from workspace root
                 rel_path = os.path.relpath(root, os.getcwd())
                 
-                # Create a pattern for JSON files in this agent's Requests folder
-                pattern = f"{rel_path}/Requests/*.json"
+                # Create a pattern for YAML files in this agent's Requests folder
+                pattern = f"{rel_path}/Requests/*.yaml"
                 
                 # Create a closure to capture the agent folder path
                 def make_handler_class(agent_path):

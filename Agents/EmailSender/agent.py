@@ -63,46 +63,42 @@ def send_gmail(to_email, subject, body, from_email, app_password, logger):
         return False
 
 
-def process(json_content, file_path, event_type, logger, workspace_path):
+def process(request, logger, workspace_path):
     """
-    Process email request from JSON content.
+    Process email request from YAML data.
     
     Args:
-        json_content: Parsed JSON content with email details
-        file_path: Path to the JSON file (in InProgress folder)
-        event_type: Type of event ('created' or 'modified')
+        request: Parsed YAML content with email details (dict)
         logger: Logger instance
         workspace_path: Path to the workspace root
+        
+    Returns:
+        Response dict or raises exception on error
     """
-    logger.info(f"EmailSender: Processing {event_type} event for {os.path.basename(file_path)}")
+    logger.info(f"EmailSender: Processing email request")
     
     # Get Gmail credentials from environment variables
     gmail_user = os.getenv('GMAIL_USER')
     gmail_app_password = os.getenv('GMAIL_APP_PASSWORD')
     
     if not gmail_user or not gmail_app_password:
-        logger.error("❌ Gmail credentials not configured!")
-        logger.error("Please set environment variables:")
-        logger.error("  - GMAIL_USER: Your Gmail address")
-        logger.error("  - GMAIL_APP_PASSWORD: Your Gmail app password")
+        error_msg = "Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD environment variables."
+        logger.error(f"❌ {error_msg}")
         logger.error("See README.md for setup instructions")
-        return
+        raise ValueError(error_msg)
     
     try:
-        # Extract email details from JSON content
-        to = json_content.get('to', '')
-        subject = json_content.get('subject', 'No subject')
-        body = json_content.get('body', '')
+        # Extract email details from request
+        to = request.get('to', '')
+        subject = request.get('subject', 'No subject')
+        body = request.get('body', '')
         
         # Validate required fields
         if not to:
-            logger.error("❌ Missing 'to' field in JSON")
-            return
+            raise ValueError("Missing 'to' field in request")
         
         # Log email details
         logger.info("📧 Email processing:")
-        logger.info(f"  - File: {os.path.basename(file_path)}")
-        logger.info(f"  - Event: {event_type}")
         logger.info(f"  - From: {gmail_user}")
         logger.info(f"  - To: {to}")
         logger.info(f"  - Subject: {subject}")
@@ -111,11 +107,17 @@ def process(json_content, file_path, event_type, logger, workspace_path):
         # Send email
         success = send_gmail(to, subject, body, gmail_user, gmail_app_password, logger)
         
-        # Log the result (file will be moved to Completed by generic handler)
+        # Return response
         if success:
-            logger.info(f"✅ Email sent successfully and will be moved to Completed folder")
+            logger.info(f"✅ Email sent successfully")
+            return {
+                "status": "sent",
+                "to": to,
+                "subject": subject,
+                "message": "Email sent successfully"
+            }
         else:
-            logger.warning(f"⚠️ Email sending failed but file will still be moved to Completed folder")
+            raise Exception("Failed to send email")
         
     except Exception as e:
         logger.error(f"❌ Error processing email: {e}")

@@ -1,6 +1,6 @@
 # EmailSender Agent
 
-Automatically sends emails via Gmail SMTP when JSON request files are created.
+Automatically sends emails via Gmail SMTP when YAML request files are created.
 
 ## Setup
 
@@ -28,33 +28,62 @@ source ~/.zshrc
 
 ## Usage
 
-### JSON Request Format
+### YAML Request Format
 
-```json
-{
-  "to": "recipient@example.com",
-  "subject": "Email Subject",
-  "body": "Email message content"
-}
+```yaml
+to: recipient@example.com
+subject: Email Subject
+body: |
+  Email message content
+  Can be multiple lines
 ```
 
 ### Send an Email
 
 ```bash
-cat > Agents/EmailSender/Requests/email.json << 'EOF'
-{
-  "to": "someone@example.com",
-  "subject": "Hello from AI4PKM",
-  "body": "This email was sent automatically!"
-}
+cat > Agents/EmailSender/Requests/email.yaml << 'EOF'
+to: someone@example.com
+subject: Hello from AI4PKM
+body: |
+  This email was sent automatically!
+  
+  The agent processed the YAML request and sent this email via Gmail.
 EOF
 ```
 
 The agent will:
-1. Detect the JSON file
-2. Move to InProgress/
-3. Send email via Gmail
-4. Move to Completed/
+1. Detect the YAML file
+2. Send email via Gmail
+3. Save result to Completed/ with request/response
+4. Remove original file from Requests/
+
+### Example Result
+
+After processing, check `Completed/` folder:
+
+**Success:**
+```yaml
+request:
+  to: someone@example.com
+  subject: Hello from AI4PKM
+  body: |
+    This email was sent automatically!
+response:
+  status: sent
+  to: someone@example.com
+  subject: Hello from AI4PKM
+  message: Email sent successfully
+timestamp: '2025-10-18T00:20:15.123456'
+```
+
+**Error:**
+```yaml
+request:
+  to: someone@example.com
+  subject: Test
+error: "Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD environment variables."
+timestamp: '2025-10-18T00:20:15.123456'
+```
 
 ## Troubleshooting
 
@@ -70,4 +99,3 @@ The agent will:
 **"SMTP connection error"**
 - Check internet connection
 - Verify Gmail SMTP not blocked by firewall
-

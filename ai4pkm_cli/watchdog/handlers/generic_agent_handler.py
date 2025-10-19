@@ -2,7 +2,9 @@
 
 import os
 import importlib.util
+import yaml
 from pathlib import Path
+from datetime import datetime
 from ..file_watchdog import BaseFileHandler
 from ...agent_factory import AgentFactory
 from ...config import Config
@@ -54,20 +56,36 @@ class GenericAgentHandler(BaseFileHandler):
                 return ""
         return ""
     
-    def _call_agent_py(self, file_path: str, event_type: str, json_content: dict) -> bool:
+    def _read_framework_prompts(self) -> str:
+        """
+        Read framework-level prompts from Agents/AGENT.md.
+        
+        Returns:
+            Contents of framework AGENT.md or empty string if file doesn't exist
+        """
+        framework_agent_md = os.path.join(self.workspace_path, "Agents", "AGENT.md")
+        if os.path.exists(framework_agent_md):
+            try:
+                with open(framework_agent_md, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                self.logger.error(f"Error reading framework AGENT.md from {framework_agent_md}: {e}")
+                return ""
+        return ""
+    
+    def _call_agent_py(self, file_path: str, request_data: dict) -> tuple[bool, any]:
         """
         Call agent.py if it exists.
         
         Args:
             file_path: Path to the file that triggered the event
-            event_type: Type of event ('created' or 'modified')
-            json_content: Parsed JSON content from the request file
+            request_data: Parsed YAML content from the request file
             
         Returns:
-            True if agent.py was called successfully, False otherwise
+            Tuple of (success: bool, response/error: any)
         """
         if not os.path.exists(self.agent_py_path):
-            return False
+            return False, "agent.py not found"
         
         try:
             # Dynamically import agent.py
@@ -81,21 +99,22 @@ class GenericAgentHandler(BaseFileHandler):
                 
                 # Call process function if it exists
                 if hasattr(module, 'process'):
-                    module.process(
-                        json_content=json_content,
-                        file_path=file_path,
-                        event_type=event_type,
+                    result = module.process(
+                        request=request_data,
                         logger=self.logger,
                         workspace_path=self.workspace_path
                     )
-                    return True
+                    return True, result
                 else:
-                    self.logger.warning(f"agent.py in {self.agent_folder_path} does not have a 'process' function")
-            return False
+                    error_msg = f"agent.py in {self.agent_folder_path} does not have a 'process' function"
+                    self.logger.warning(error_msg)
+                    return False, error_msg
+            return False, "Failed to load module"
             
         except Exception as e:
-            self.logger.error(f"Error executing agent.py from {self.agent_py_path}: {e}")
-            return False
+            error_msg = f"Error executing agent.py: {str(e)}"
+            self.logger.error(error_msg)
+            return False, error_msg
     
     def _move_to_folder(self, file_path: str, folder_name: str) -> str:
         """
@@ -110,7 +129,6 @@ class GenericAgentHandler(BaseFileHandler):
         """
         import os
         import shutil
-        from datetime import datetime
         
         # Create target folder
         target_dir = os.path.join(self.full_agent_folder, folder_name)
@@ -126,6 +144,45 @@ class GenericAgentHandler(BaseFileHandler):
         self.logger.info(f"📦 Moved to {folder_name}: {new_path}")
         
         return new_path
+    
+    def _save_to_completed(self, request_data: dict, response_or_error: any, is_error: bool, original_filename: str):
+        """
+        Save request/response or request/error pair to Completed folder.
+        
+        Args:
+            request_data: Original request data
+            response_or_error: Response data or error message
+            is_error: Whether this is an error or successful response
+            original_filename: Original filename without timestamp
+        """
+        import os
+        
+        # Create completed folder
+        completed_dir = os.path.join(self.full_agent_folder, 'Completed')
+        os.makedirs(completed_dir, exist_ok=True)
+        
+        # Create result dictionary
+        result = {
+            'request': request_data,
+            'timestamp': datetime.now().isoformat(),
+        }
+        
+        if is_error:
+            result['error'] = str(response_or_error)
+        else:
+            result['response'] = response_or_error
+        
+        # Generate filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = os.path.splitext(original_filename)[0]
+        result_path = os.path.join(completed_dir, f"{timestamp}_{base_name}.yaml")
+        
+        # Save to YAML
+        with open(result_path, 'w', encoding='utf-8') as f:
+            yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
+        
+        status = "error" if is_error else "completed"
+        self.logger.info(f"📦 Saved {status} to: {result_path}")
     
     def process(self, file_path: str, event_type: str) -> None:
         """
@@ -157,94 +214,112 @@ class GenericAgentHandler(BaseFileHandler):
             self.logger.debug(f"[{self.agent_name}] Ignoring file in {file_path}")
             return
         
-        in_progress_path = None
+        original_filename = os.path.basename(file_path)
         
         try:
-            # Step 1: Move to InProgress
-            in_progress_path = self._move_to_folder(file_path, 'InProgress')
-            
-            # Step 2: Read and parse JSON content
-            json_content = {}
+            # Step 1: Read and parse YAML content
+            request_data = {}
             try:
-                with open(in_progress_path, 'r', encoding='utf-8') as f:
-                    json_content = json.load(f)
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    request_data = yaml.safe_load(f)
             except Exception as e:
-                self.logger.error(f"Failed to parse JSON from {in_progress_path}: {e}")
+                error_msg = f"Failed to parse YAML from {file_path}: {e}"
+                self.logger.error(error_msg)
+                self._save_to_completed(request_data or {}, error_msg, True, original_filename)
+                os.remove(file_path)
                 return
             
-            # Step 3: Read prompts from AGENT.md
+            # Step 2: Read prompts from AGENT.md
             prompts = self._read_agent_prompts()
             
-            # Step 4: Process based on what's available
-            success = False
+            # Step 3: Process based on what's available
+            response_or_error = None
+            is_error = False
             
             # AGENT.md takes precedence - if it exists, use AI agent with prompts
             if prompts:
-                success = self._execute_prompts(in_progress_path, event_type, prompts, json_content)
+                response_or_error, is_error = self._execute_prompts(file_path, prompts, request_data)
             # If no AGENT.md, try to call agent.py
-            elif self._call_agent_py(in_progress_path, event_type, json_content):
-                self.logger.info(f"[{self.agent_name}] Successfully executed agent.py")
-                success = True
+            elif os.path.exists(self.agent_py_path):
+                success, result = self._call_agent_py(file_path, request_data)
+                is_error = not success
+                response_or_error = result
             else:
-                # Neither found or both failed
-                self.logger.warning(
-                    f"[{self.agent_name}] Agent execution failed or no handler configured"
-                )
+                # Neither found
+                error_msg = f"Agent execution failed or no handler configured"
+                self.logger.warning(f"[{self.agent_name}] {error_msg}")
+                response_or_error = error_msg
+                is_error = True
             
-            # Step 5: Move to Completed
-            if in_progress_path and os.path.exists(in_progress_path):
-                self._move_to_folder(in_progress_path, 'Completed')
+            # Step 4: Save to Completed with request/response or request/error
+            self._save_to_completed(request_data, response_or_error, is_error, original_filename)
+            
+            # Step 5: Remove original file from Requests
+            os.remove(file_path)
                 
         except Exception as e:
-            self.logger.error(f"[{self.agent_name}] Error processing file {file_path}: {e}")
-            # If there was an error, still try to move from InProgress to Completed
-            if in_progress_path and os.path.exists(in_progress_path):
-                try:
-                    self._move_to_folder(in_progress_path, 'Completed')
-                except:
-                    pass
+            error_msg = f"Error processing file {file_path}: {e}"
+            self.logger.error(f"[{self.agent_name}] {error_msg}")
+            # Save error to Completed
+            try:
+                self._save_to_completed(request_data if 'request_data' in locals() else {}, error_msg, True, original_filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except:
+                pass
     
-    def _execute_prompts(self, file_path: str, event_type: str, prompts: str, json_content: dict) -> bool:
+    def _execute_prompts(self, file_path: str, prompts: str, request_data: dict) -> tuple[any, bool]:
         """
-        Execute prompts directly using the AI agent.
+        Execute prompts using the AI agent with framework context.
         
         Args:
             file_path: Path to the file that triggered the event
-            event_type: Type of event ('created' or 'modified')
-            prompts: Contents of AGENT.md
-            json_content: Parsed JSON content from the request file
+            prompts: Contents of agent's AGENT.md
+            request_data: Parsed YAML content from the request file
             
         Returns:
-            bool: True if successful, False otherwise
+            Tuple of (response, is_error: bool)
         """
         try:
             import os
-            import json
             
-            # Format JSON content for prompt
-            json_str = json.dumps(json_content, indent=2)
+            # Format YAML content for prompt
+            yaml_str = yaml.dump(request_data, default_flow_style=False, allow_unicode=True)
+            
+            # Read framework-level prompts
+            framework_prompts = self._read_framework_prompts()
             
             # Create agent
             agent = AgentFactory.create_agent(self.logger, self.config)
             
-            # Construct prompt with JSON content
+            # Construct prompt with framework context and request data
             full_prompt = f"""
+# Agent Framework Context
+
+{framework_prompts}
+
+---
+
+# Agent-Specific Instructions
+
 {prompts}
 
 ---
 
+# Request
+
 Request File: {os.path.basename(file_path)}
 
-JSON Content:
-```json
-{json_str}
+Request Data:
+```yaml
+{yaml_str}
 ```
 
-Please process this request according to the instructions above.
+Please process this request according to the instructions above and return your response.
 """
             
             self.logger.info(f"🤖 Executing {self.agent_name} agent with AI")
-            self.logger.info(f"File: {os.path.basename(file_path)} ({event_type})")
+            self.logger.info(f"File: {os.path.basename(file_path)}")
             
             # Execute the agent using run_prompt
             result = agent.run_prompt(inline_prompt=full_prompt)
@@ -254,12 +329,14 @@ Please process this request according to the instructions above.
                 self.logger.info(f"✅ {self.agent_name} AI execution completed successfully")
                 if session_id:
                     self.logger.info(f"Session ID: {session_id}")
-                return True
+                return response_text, False  # Success
             else:
-                self.logger.warning(f"⚠️ {self.agent_name} AI execution completed with no response")
-                return False
+                error_msg = "AI execution completed with no response"
+                self.logger.warning(f"⚠️ {self.agent_name} {error_msg}")
+                return error_msg, True  # Error
                 
         except Exception as e:
-            self.logger.error(f"Error executing {self.agent_name} prompts: {e}")
-            return False
+            error_msg = f"Error executing {self.agent_name} prompts: {str(e)}"
+            self.logger.error(error_msg)
+            return error_msg, True  # Error
 
