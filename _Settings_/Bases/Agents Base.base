@@ -1,0 +1,23 @@
+properties:
+  note.input_path:
+    displayName: input_path
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.path.startsWith("_Settings_/Agents")
+    order:
+      - file.name
+      - title
+      - input_path
+      - input_type
+      - output_path
+      - output_type
+    sort:
+      - property: input_path
+        direction: DESC
+    columnSize:
+      file.name: 92
+      note.title: 193
+      note.output_path: 123
