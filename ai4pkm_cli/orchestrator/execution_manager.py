@@ -220,14 +220,26 @@ class ExecutionManager:
 
             # Update task file with final status
             if ctx.task_file:
-                # Determine output file link if applicable
+                # Validate output and determine final status
+                final_status = ctx.status
                 output_link = None
+                validation_error = None
+
                 if ctx.status == 'completed' and 'path' in trigger_data:
-                    output_link = f"[[{trigger_data['path']}]]"
+                    # Validate output based on output_type
+                    output_valid, output_link, validation_error = self._validate_output(
+                        agent, trigger_data, ctx
+                    )
+
+                    # If validation failed, mark as FAILED
+                    if not output_valid:
+                        final_status = 'failed'
+                        if not ctx.error_message:
+                            ctx.error_message = validation_error
 
                 self.task_manager.update_task_status(
                     task_path=ctx.task_file,
-                    status="PROCESSED" if ctx.status == 'completed' else "FAILED",
+                    status="PROCESSED" if final_status == 'completed' else "FAILED",
                     output=output_link,
                     error_message=ctx.error_message
                 )
@@ -438,7 +450,23 @@ class ExecutionManager:
         # Add trigger context
         prompt += "\n\n# Trigger Context\n"
         prompt += f"- Event: {trigger_data.get('event_type', 'unknown')}\n"
-        prompt += f"- Path: {trigger_data.get('path', 'unknown')}\n"
+        prompt += f"- Input Path: {trigger_data.get('path', 'unknown')}\n"
+
+        # Add output configuration
+        if agent.output_path:
+            prompt += f"\n# Output Configuration\n"
+            prompt += f"- Output Directory: {agent.output_path}\n"
+            prompt += f"- Output Type: {agent.output_type}\n"
+
+            # Add guidance based on output type
+            if agent.output_type == "new_file":
+                prompt += f"\n**IMPORTANT**: Create a NEW file in the `{agent.output_path}` directory.\n"
+                prompt += f"Do NOT modify the input file inline. The output should be a separate file.\n"
+                if agent.output_naming:
+                    prompt += f"Use naming pattern: {agent.output_naming}\n"
+            elif agent.output_type == "update_file":
+                prompt += f"\n**IMPORTANT**: Update the input file IN PLACE.\n"
+                prompt += f"Do NOT create a new file.\n"
 
         # Add frontmatter if available
         if 'frontmatter' in trigger_data:
@@ -447,6 +475,78 @@ class ExecutionManager:
                 prompt += f"- {key}: {value}\n"
 
         return prompt
+
+    def _validate_output(self, agent: AgentDefinition, trigger_data: Dict, ctx: ExecutionContext) -> tuple:
+        """
+        Validate that the expected output was created.
+
+        Args:
+            agent: Agent definition
+            trigger_data: Trigger event data
+            ctx: Execution context
+
+        Returns:
+            Tuple of (is_valid, output_link, error_message)
+        """
+        input_path_str = trigger_data.get('path', '')
+        input_path = self.vault_path / input_path_str if input_path_str else None
+
+        # If no output_path configured, assume inline update
+        if not agent.output_path:
+            # Verify input file still exists
+            if input_path and input_path.exists():
+                return True, f"[[{input_path_str}]]", None
+            else:
+                return False, None, "Input file no longer exists"
+
+        # For update_file: verify input file was modified
+        if agent.output_type == "update_file":
+            if not input_path or not input_path.exists():
+                return False, None, f"Input file not found: {input_path_str}"
+
+            # Check if file was modified during execution
+            file_mtime = input_path.stat().st_mtime
+            start_time = ctx.start_time.timestamp() - 5 if ctx.start_time else 0
+
+            if file_mtime >= start_time:
+                return True, f"[[{input_path_str}]]", None
+            else:
+                return False, f"[[{input_path_str}]]", "Input file was not modified (update_file mode)"
+
+        # For new_file: verify output directory has new files
+        if agent.output_type == "new_file":
+            output_dir = self.vault_path / agent.output_path
+            if not output_dir.exists():
+                return False, None, f"Output directory does not exist: {agent.output_path}"
+
+            # Look for markdown files created/modified after execution started
+            start_time = ctx.start_time.timestamp() - 5 if ctx.start_time else 0
+            input_filename = Path(input_path_str).stem if input_path_str else ''
+
+            recent_files = []
+            for md_file in output_dir.glob("*.md"):
+                if md_file.stat().st_mtime >= start_time:
+                    # Prioritize files with matching input filename
+                    if input_filename and input_filename in md_file.stem:
+                        recent_files.insert(0, md_file)
+                    else:
+                        recent_files.append(md_file)
+
+            if recent_files:
+                # Use the most relevant file (first in list)
+                output_file = recent_files[0]
+                try:
+                    rel_path = output_file.relative_to(self.vault_path)
+                    output_link = f"[[{rel_path.parent}/{rel_path.stem}]]"
+                    logger.info(f"Found output file: {rel_path}")
+                    return True, output_link, None
+                except ValueError:
+                    return True, f"[[{output_file}]]", None
+            else:
+                return False, None, f"No new file found in {agent.output_path} (new_file mode)"
+
+        # Default: no validation
+        return True, f"[[{input_path_str}]]" if input_path_str else None, None
 
     def _prepare_log_path(self, agent: AgentDefinition, ctx: ExecutionContext) -> Path:
         """

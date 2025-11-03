@@ -134,6 +134,9 @@ Each node defines an agent with the following fields:
   - Single path: watches for new files in that directory
   - Multiple paths: triggers on first path (full multi-input support coming soon)
 - `output_path` - Output directory for results
+- `output_type` - How to create output (optional, default: `new_file`)
+  - `new_file`: Create new file in output directory
+  - `update_file`: Modify input file in place
 - `cron` - Cron schedule for periodic execution (future feature)
 
 **Agent-Specific Settings** (override defaults):
@@ -144,6 +147,36 @@ Each node defines an agent with the following fields:
 - `timeout_minutes` - Execution timeout in minutes (e.g., `60`)
 - `max_parallel` - Max concurrent executions for this agent (e.g., `1`)
 - `task_priority` - Task priority level: `"low"`, `"medium"`, or `"high"`
+
+**Output Configuration:**
+
+The orchestrator supports two output modes:
+
+1. **new_file** (default) - Creates a new file in the output directory
+2. **update_file** - Updates the input file in place
+
+```yaml
+nodes:
+  # Create new files in output directory
+  - type: agent
+    name: Enrich Ingested Content (EIC)
+    input_path: Ingest/Clippings
+    output_path: AI/Articles
+    output_type: new_file  # Creates new file in AI/Articles
+
+  # Update files in place
+  - type: agent
+    name: Daily Note Enhancer (DNE)
+    input_path: Journal
+    output_path: Journal
+    output_type: update_file  # Modifies existing file
+```
+
+The orchestrator automatically:
+- Injects output configuration into agent prompts
+- Validates that output files were created/modified
+- Detects files created via atomic writes (temporary file + rename)
+- Triggers downstream agents when new files appear
 
 **Example with agent-specific settings:**
 
@@ -164,6 +197,7 @@ nodes:
     name: Enrich Ingested Content (EIC)
     input_path: Ingest/Clippings
     output_path: AI/Articles
+    output_type: new_file
     trigger_exclude_pattern: "*-EIC*"
 ```
 
@@ -294,5 +328,5 @@ ai4pkm -o
 
 ---
 
-*Last Updated: 2025-11-01*
+*Last Updated: 2025-11-03*
 *Version: 1.0 (Nodes-based configuration with orchestrator.yaml)*

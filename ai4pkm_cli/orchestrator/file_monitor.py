@@ -78,6 +78,13 @@ class _FileEventHandler(FileSystemEventHandler):
         if not event.is_directory and event.src_path.endswith('.md'):
             self._queue_event(event, 'deleted')
 
+    def on_moved(self, event: FileSystemEvent):
+        """Handle file move/rename events (e.g., atomic writes)."""
+        if not event.is_directory and event.dest_path.endswith('.md'):
+            # Treat destination of move as a creation event
+            # This handles atomic writes (temp file -> final file)
+            self._queue_event_for_moved(event, 'created')
+
     def _queue_event(self, event: FileSystemEvent, event_type: str):
         """Queue a file event for processing."""
         file_path = Path(event.src_path)
@@ -105,3 +112,31 @@ class _FileEventHandler(FileSystemEventHandler):
 
         self.event_queue.put(file_event)
         logger.debug(f"Queued {event_type} event: {relative_path}")
+
+    def _queue_event_for_moved(self, event: FileSystemEvent, event_type: str):
+        """Queue a move event using the destination path."""
+        file_path = Path(event.dest_path)  # Use destination path
+
+        # Make path relative to vault
+        try:
+            relative_path = file_path.relative_to(self.vault_path)
+        except ValueError:
+            relative_path = file_path
+
+        # Parse frontmatter if file exists
+        frontmatter = {}
+        if file_path.exists():
+            frontmatter = read_frontmatter(file_path)
+
+        # Create FileEvent object
+        from .models import FileEvent
+        file_event = FileEvent(
+            path=str(relative_path),
+            event_type=event_type,
+            is_directory=event.is_directory,
+            timestamp=datetime.now(),
+            frontmatter=frontmatter
+        )
+
+        self.event_queue.put(file_event)
+        logger.debug(f"Queued {event_type} event (from move): {relative_path}")

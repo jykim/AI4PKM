@@ -27,6 +27,7 @@ nodes:
     name: Enrich Ingested Content (EIC)
     input_path: Ingest/Clippings
     output_path: AI/Articles
+    output_type: new_file  # Create new files in AI/Articles
 
   # Generate Daily Roundup
   - type: agent
