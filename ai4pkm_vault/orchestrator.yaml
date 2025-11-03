@@ -29,18 +29,6 @@ nodes:
     output_path: AI/Articles
     output_type: new_file  # Create new files in AI/Articles
 
-  # Generate Daily Roundup
-  - type: agent
-    name: Generate Daily Roundup (GDR)
-    cron: 0 1 * * * # 1AM every day
-    output_path: AI/Roundup
-
-  # Process Life Logs
-  - type: agent
-    name: Process Life Logs (PLL)
-    input_path: Ingest/Limitless
-    output_path: AI/Lifelog
-
   # Create Thread Postings
   - type: agent
     name: Create Thread Postings (CTP)
@@ -50,25 +38,34 @@ nodes:
       - AI/Research
     output_path: AI/Sharable
 
-  # Pick and Process Photos
-  - type: agent
-    name: Pick and Process Photos (PPP)
-    input_path:
-      - Ingest/Photolog/Processed/*.jpg
-      - Ingest/Photolog/Processed/*.jpeg
-      - Ingest/Photolog/Processed/*.png
-      - Ingest/Photolog/Processed/*.yaml
-    output_path: Ingest/Photolog
+  # Batch workflow support is TBA
+  # # Generate Daily Roundup
+  # - type: agent
+  #   name: Generate Daily Roundup (GDR)
+  #   cron: 0 1 * * * # 1AM every day
+  #   output_path: AI/Roundup
 
-  # Generate Event Summary
-  - type: agent
-    name: Generate Event Summary (GES)
-    input_path:
-      - Ingest/Limitless
-      - MCP#gcal
-    output_path: AI/Events
+  # # Process Life Logs
+  # - type: agent
+  #   name: Process Life Logs (PLL)
+  #   input_path: Ingest/Limitless
+  #   output_path: AI/Lifelog
+
+  # # Pick and Process Photos
+  # - type: agent
+  #   name: Pick and Process Photos (PPP)
+  #   input_path:
+  #     - Ingest/Photolog/Processed/*.jpg
+  #     - Ingest/Photolog/Processed/*.jpeg
+  #     - Ingest/Photolog/Processed/*.png
+  #     - Ingest/Photolog/Processed/*.yaml
+  #   output_path: Ingest/Photolog
+
+  # # Generate Event Summary
+  # - type: agent
+  #   name: Generate Event Summary (GES)
+  #   input_path:
+  #     - Ingest/Limitless
+  #     - MCP#gcal
+  #   output_path: AI/Events
   
-  # Ad-hoc Research within PKM
-  - type: agent
-    name: Ad-hoc Research within PKM (ARP)
-    output_path: AI/Research
