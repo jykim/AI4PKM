@@ -264,6 +264,9 @@ class AgentRegistry:
         if isinstance(trigger_wait_for, str):
             trigger_wait_for = [trigger_wait_for]
 
+        # Extract cron expression from node config
+        cron = node.get('cron')
+
         # Apply node config with defaults (orchestrator.yaml is only source)
         executor = node.get('executor', defaults.get('executor', 'claude_code'))
         max_parallel = int(node.get('max_parallel', defaults.get('max_parallel', 1)))
@@ -282,6 +285,7 @@ class AgentRegistry:
             trigger_content_pattern=node.get('trigger_content_pattern'),
             trigger_schedule=node.get('trigger_schedule'),
             trigger_wait_for=trigger_wait_for,
+            cron=cron,
             input_path=input_path,
             input_type=input_type,
             output_path=output_path,
@@ -379,12 +383,17 @@ class AgentRegistry:
 
         Args:
             agent: AgentDefinition to check
-            event_path: File path from event
-            event_type: Event type (created, modified, deleted)
+            event_path: File path from event (may be empty for scheduled events)
+            event_type: Event type (created, modified, deleted, scheduled)
 
         Returns:
             True if event matches agent's trigger
         """
+        # Handle scheduled events (cron-based)
+        if event_type == 'scheduled':
+            # Match agents that have cron expression set
+            return agent.cron is not None
+
         # Manual agents never match file events
         if agent.trigger_pattern is None or agent.trigger_event == 'manual':
             return False

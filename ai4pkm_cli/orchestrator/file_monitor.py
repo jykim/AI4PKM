@@ -100,9 +100,9 @@ class _FileEventHandler(FileSystemEventHandler):
         if file_path.exists() and event_type != 'deleted':
             frontmatter = read_frontmatter(file_path)
 
-        # Create FileEvent object (not dict!)
-        from .models import FileEvent
-        file_event = FileEvent(
+        # Create TriggerEvent object (not dict!)
+        from .models import TriggerEvent
+        trigger_event = TriggerEvent(
             path=str(relative_path),
             event_type=event_type,
             is_directory=event.is_directory,
@@ -110,7 +110,7 @@ class _FileEventHandler(FileSystemEventHandler):
             frontmatter=frontmatter
         )
 
-        self.event_queue.put(file_event)
+        self.event_queue.put(trigger_event)
         logger.debug(f"Queued {event_type} event: {relative_path}")
 
     def _queue_event_for_moved(self, event: FileSystemEvent, event_type: str):
@@ -128,9 +128,9 @@ class _FileEventHandler(FileSystemEventHandler):
         if file_path.exists():
             frontmatter = read_frontmatter(file_path)
 
-        # Create FileEvent object
-        from .models import FileEvent
-        file_event = FileEvent(
+        # Create TriggerEvent object
+        from .models import TriggerEvent
+        trigger_event = TriggerEvent(
             path=str(relative_path),
             event_type=event_type,
             is_directory=event.is_directory,
@@ -138,5 +138,5 @@ class _FileEventHandler(FileSystemEventHandler):
             frontmatter=frontmatter
         )
 
-        self.event_queue.put(file_event)
+        self.event_queue.put(trigger_event)
         logger.debug(f"Queued {event_type} event (from move): {relative_path}")

@@ -26,6 +26,7 @@ class AgentDefinition:
 
     # Input/output
     input_path: List[str] = field(default_factory=list)
+    cron: Optional[str] = None  # Cron expression for scheduled triggers
     input_type: str = "new_file"
     output_path: str = ""
     output_type: str = "new_file"
@@ -91,10 +92,10 @@ class ExecutionContext:
 
 
 @dataclass
-class FileEvent:
-    """Represents a file system event."""
+class TriggerEvent:
+    """Represents a trigger event (file system or scheduled)."""
     path: str
-    event_type: str  # created, modified, deleted
+    event_type: str  # created, modified, deleted, scheduled
     is_directory: bool
     timestamp: datetime
     frontmatter: Dict[str, Any] = field(default_factory=dict)

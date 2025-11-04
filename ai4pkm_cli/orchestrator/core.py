@@ -13,7 +13,7 @@ from queue import Empty
 from .file_monitor import FileSystemMonitor
 from .agent_registry import AgentRegistry
 from .execution_manager import ExecutionManager
-from .models import FileEvent, ExecutionContext
+from .models import TriggerEvent, ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,13 @@ class Orchestrator:
             orchestrator_settings=self.agent_registry.orchestrator_settings
         )
         self.file_monitor = FileSystemMonitor(self.vault_path, self.agent_registry)
+
+        # Initialize cron scheduler
+        from .cron_scheduler import CronScheduler
+        self.cron_scheduler = CronScheduler(
+            self.agent_registry,
+            self.file_monitor.event_queue
+        )
 
         # Control state
         self._running = False
@@ -167,6 +174,9 @@ class Orchestrator:
         # Start file monitor
         self.file_monitor.start()
 
+        # Start cron scheduler
+        self.cron_scheduler.start()
+
         # Start event processing thread
         self._running = True
         self._event_thread = threading.Thread(target=self._event_loop, daemon=True)
@@ -184,6 +194,9 @@ class Orchestrator:
 
         # Stop event processing
         self._running = False
+
+        # Stop cron scheduler
+        self.cron_scheduler.stop()
 
         # Stop file monitor
         self.file_monitor.stop()
@@ -206,13 +219,13 @@ class Orchestrator:
             try:
                 # Poll event queue with timeout
                 try:
-                    file_event = self.file_monitor.event_queue.get(timeout=self.poll_interval)
+                    trigger_event = self.file_monitor.event_queue.get(timeout=self.poll_interval)
                 except Empty:
                     # No events, continue polling
                     continue
 
                 # Process event
-                self._process_event(file_event)
+                self._process_event(trigger_event)
 
                 # Check for queued tasks after processing event
                 self._process_queued_tasks()
@@ -223,32 +236,32 @@ class Orchestrator:
 
         logger.info("Event loop stopped")
 
-    def _process_event(self, file_event: FileEvent):
+    def _process_event(self, trigger_event: TriggerEvent):
         """
-        Process a single file event.
+        Process a single trigger event.
 
         Args:
-            file_event: File event to process
+            trigger_event: Trigger event to process (file or scheduled)
         """
-        logger.debug(f"Processing event: {file_event.event_type} {file_event.path}")
+        logger.info(f"Processing event: {trigger_event.event_type} {trigger_event.path}")
 
-        # Convert FileEvent to event_data dict
+        # Convert TriggerEvent to event_data dict
         event_data = {
-            'path': file_event.path,
-            'event_type': file_event.event_type,
-            'is_directory': file_event.is_directory,
-            'timestamp': file_event.timestamp,
-            'frontmatter': file_event.frontmatter
+            'path': trigger_event.path,
+            'event_type': trigger_event.event_type,
+            'is_directory': trigger_event.is_directory,
+            'timestamp': trigger_event.timestamp,
+            'frontmatter': trigger_event.frontmatter
         }
 
         # Find matching agents
         matching_agents = self.agent_registry.find_matching_agents(event_data)
 
         if not matching_agents:
-            logger.debug(f"No agents match event: {file_event.path}")
+            logger.debug(f"No agents match event: {trigger_event.path}")
             return
 
-        logger.info(f"Found {len(matching_agents)} matching agent(s) for {file_event.path}")
+        logger.info(f"Found {len(matching_agents)} matching agent(s) for {trigger_event.path}")
 
         # Execute each matching agent
         for agent in matching_agents:
@@ -297,7 +310,7 @@ class Orchestrator:
                 continue
 
             # Log agent start
-            logger.info(f"Starting {agent.abbreviation}: {file_event.path}")
+            logger.info(f"Starting {agent.abbreviation}: {trigger_event.path}")
 
             # Execute in background thread (slot already reserved)
             execution_thread = threading.Thread(

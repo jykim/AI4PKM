@@ -2,7 +2,7 @@
 import pytest
 from datetime import datetime
 from pathlib import Path
-from ai4pkm_cli.orchestrator.models import AgentDefinition, ExecutionContext, FileEvent
+from ai4pkm_cli.orchestrator.models import AgentDefinition, ExecutionContext, TriggerEvent
 
 
 def test_agent_definition_minimal():
@@ -43,9 +43,9 @@ def test_execution_context_success():
     assert context.success is False
 
 
-def test_file_event_creation():
-    """Test FileEvent creation."""
-    event = FileEvent(
+def test_trigger_event_creation():
+    """Test TriggerEvent creation."""
+    event = TriggerEvent(
         path="test.md",
         event_type="created",
         is_directory=False,

@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 
 from ai4pkm_cli.orchestrator.core import Orchestrator
-from ai4pkm_cli.orchestrator.models import AgentDefinition, FileEvent
+from ai4pkm_cli.orchestrator.models import AgentDefinition, TriggerEvent
 
 
 class TestOrchestrator:
@@ -126,7 +126,7 @@ Test prompt body
         orch = Orchestrator(vault_path, agents_dir)
 
         # Create event that matches agent pattern
-        file_event = FileEvent(
+        trigger_event = TriggerEvent(
             path="Ingest/Clippings/test.md",
             event_type="created",
             is_directory=False,
@@ -135,7 +135,7 @@ Test prompt body
         )
 
         # Process event
-        orch._process_event(file_event)
+        orch._process_event(trigger_event)
 
         # Give thread time to execute
         time.sleep(0.1)
@@ -151,7 +151,7 @@ Test prompt body
         orch = Orchestrator(vault_path, agents_dir)
 
         # Create event that doesn't match any pattern
-        file_event = FileEvent(
+        trigger_event = TriggerEvent(
             path="Random/path/file.md",
             event_type="created",
             is_directory=False,
@@ -160,7 +160,7 @@ Test prompt body
         )
 
         # Process event (should not raise error)
-        orch._process_event(file_event)
+        orch._process_event(trigger_event)
 
     @patch('ai4pkm_cli.orchestrator.core.ExecutionManager.can_execute')
     def test_process_event_concurrency_limit_reached(self, mock_can_execute, sample_agent_file):
@@ -172,7 +172,7 @@ Test prompt body
 
         orch = Orchestrator(vault_path, agents_dir)
 
-        file_event = FileEvent(
+        trigger_event = TriggerEvent(
             path="Ingest/Clippings/test.md",
             event_type="created",
             is_directory=False,
@@ -181,7 +181,7 @@ Test prompt body
         )
 
         # Process event (should log warning but not error)
-        orch._process_event(file_event)
+        orch._process_event(trigger_event)
 
         assert mock_can_execute.called
 
