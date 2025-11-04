@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import fnmatch
 
-from .models import AgentDefinition
+from .models import AgentDefinition, CommandDefinition
 from ..markdown_utils import read_frontmatter, extract_body
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ class AgentRegistry:
         self.vault_path = Path(vault_path)
         self.config = config or Config()
         self.agents: Dict[str, AgentDefinition] = {}
+        self.commands: Dict[str, CommandDefinition] = {}
 
         # Load centralized orchestrator configuration
         orchestrator_yaml_path = vault_path / "orchestrator.yaml"
@@ -107,6 +108,21 @@ class AgentRegistry:
 
         logger.info(f"Total agents loaded: {len(self.agents)}")
 
+        # Load command nodes
+        command_nodes = [n for n in nodes if n.get('type') == 'command']
+        logger.info(f"Loading {len(command_nodes)} commands from orchestrator.yaml")
+
+        for node in command_nodes:
+            try:
+                command = self._load_command(node)
+                if command:
+                    self.commands[command.abbreviation] = command
+                    logger.info(f"Loaded command: {command.abbreviation} ({command.name})")
+            except Exception as e:
+                logger.error(f"Error loading command from node: {e}")
+
+        logger.info(f"Total commands loaded: {len(self.commands)}")
+
     def _find_agent_prompt_file(self, abbreviation: str) -> Optional[Path]:
         """
         Find the prompt file for an agent by abbreviation.
@@ -139,17 +155,17 @@ class AgentRegistry:
 
     def _extract_abbreviation(self, name: str) -> Optional[str]:
         """
-        Extract abbreviation from agent name.
+        Extract abbreviation from agent/command name.
 
         Expects format: "Full Name (ABBR)"
 
         Args:
-            name: Agent name string
+            name: Agent or command name string
 
         Returns:
             Abbreviation string, or None if not found
         """
-        match = re.search(r'\(([A-Z]{3,4})\)$', name)
+        match = re.search(r'\(([A-Z]{2,4})\)$', name)
         return match.group(1) if match else None
 
     def _load_orchestrator_yaml(self, yaml_path: Path) -> dict:
@@ -357,6 +373,57 @@ class AgentRegistry:
 
         return trigger_pattern, trigger_event
 
+    def _load_command(self, node: dict) -> Optional[CommandDefinition]:
+        """
+        Load a single command definition from node config.
+
+        Args:
+            node: Node configuration from orchestrator.yaml
+
+        Returns:
+            CommandDefinition instance or None if invalid
+        """
+        # Extract abbreviation from name field: "Name (ABBR)"
+        abbr = self._extract_abbreviation(node.get('name', ''))
+        if not abbr:
+            logger.warning(f"Cannot extract abbreviation from: {node.get('name')}")
+            return None
+
+        # Get defaults from orchestrator config
+        defaults = self.orchestrator_config.get('defaults', {})
+
+        # Extract command configuration
+        command_str = node.get('command')
+        if not command_str:
+            logger.error(f"Missing 'command' field for command {abbr}")
+            return None
+
+        # Parse arguments (can be dict or null)
+        arguments = node.get('arguments', {})
+        if arguments is None:
+            arguments = {}
+
+        command = CommandDefinition(
+            name=node.get('name', ''),
+            abbreviation=abbr,
+            category=node.get('category', 'ingestion'),
+            command=command_str,
+            arguments=arguments,
+            trigger_schedule=node.get('trigger_schedule'),
+            cron=node.get('cron'),
+            output_path=node.get('output_path', ''),
+            timeout_minutes=int(node.get('timeout_minutes', defaults.get('timeout_minutes', 30))),
+            max_parallel=int(node.get('max_parallel', defaults.get('max_parallel', 1))),
+            task_create=node.get('task_create', defaults.get('task_create', True)),
+            task_priority=node.get('task_priority', defaults.get('task_priority', 'medium')),
+            task_archived=node.get('task_archived', defaults.get('task_archived', False)),
+            log_prefix=node.get('log_prefix', abbr),
+            log_pattern=node.get('log_pattern', '{timestamp}-{command}.log'),
+            version=node.get('version', '1.0')
+        )
+
+        return command
+
     def find_matching_agents(self, event_data: Dict) -> List[AgentDefinition]:
         """
         Find agents whose triggers match the event.
@@ -374,6 +441,29 @@ class AgentRegistry:
         for agent in self.agents.values():
             if self._matches_trigger(agent, event_path, event_type):
                 matching.append(agent)
+
+        return matching
+
+    def find_matching_commands(self, event_data: Dict) -> List[CommandDefinition]:
+        """
+        Find commands whose triggers match the event.
+
+        Args:
+            event_data: Event dictionary with event_type, etc.
+
+        Returns:
+            List of matching CommandDefinition instances
+        """
+        matching = []
+        event_type = event_data.get('event_type', '')
+
+        # Only scheduled events trigger commands
+        if event_type != 'scheduled':
+            return matching
+
+        for command in self.commands.values():
+            if command.cron is not None:
+                matching.append(command)
 
         return matching
 

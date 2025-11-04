@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from .models import AgentDefinition, ExecutionContext
+from .models import AgentDefinition, CommandDefinition, ExecutionContext
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class ExecutionManager:
 
         return True
 
-    def reserve_slot(self, agent: AgentDefinition) -> bool:
+    def reserve_slot(self, agent_or_command) -> bool:
         """
         Atomically check if can execute and reserve a slot.
 
@@ -123,11 +123,15 @@ class ExecutionManager:
         before any of them increment the counters.
 
         Args:
-            agent: Agent definition
+            agent_or_command: AgentDefinition or CommandDefinition
 
         Returns:
             True if slot was reserved, False if at capacity
         """
+        # Get abbreviation and max_parallel from either type
+        abbreviation = agent_or_command.abbreviation
+        max_parallel = agent_or_command.max_parallel
+
         with self._count_lock:
             # Check global limit
             if self._running_count >= self.max_concurrent:
@@ -137,16 +141,16 @@ class ExecutionManager:
             self._running_count += 1
 
         with self._agent_lock:
-            # Check per-agent limit
-            agent_count = self._agent_counts.get(agent.abbreviation, 0)
-            if agent_count >= agent.max_parallel:
-                # Release global slot since we can't reserve agent slot
+            # Check per-agent/command limit
+            count = self._agent_counts.get(abbreviation, 0)
+            if count >= max_parallel:
+                # Release global slot since we can't reserve slot
                 with self._count_lock:
                     self._running_count -= 1
                 return False
 
-            # Reserve agent slot immediately
-            self._agent_counts[agent.abbreviation] = agent_count + 1
+            # Reserve slot immediately
+            self._agent_counts[abbreviation] = count + 1
 
         return True
 
@@ -261,6 +265,93 @@ class ExecutionManager:
 
             with self._agent_lock:
                 self._agent_counts[agent.abbreviation] -= 1
+
+            with self._executions_lock:
+                del self._running_executions[ctx.execution_id]
+
+        return ctx
+
+    def execute_command(self, command: 'CommandDefinition', trigger_data: Dict, slot_reserved: bool = False) -> ExecutionContext:
+        """
+        Execute a command task.
+
+        Args:
+            command: CommandDefinition to execute
+            trigger_data: Data about the triggering event
+            slot_reserved: If True, slot was already reserved by reserve_slot()
+
+        Returns:
+            ExecutionContext with execution results
+        """
+        from ..commands.command_runner import CommandRunner
+        from datetime import datetime
+
+        ctx = ExecutionContext(
+            command=command,
+            trigger_data=trigger_data,
+            start_time=datetime.now()
+        )
+
+        # Increment counters only if not already reserved
+        if not slot_reserved:
+            with self._count_lock:
+                self._running_count += 1
+
+            # Track by command abbreviation
+            with self._agent_lock:
+                self._agent_counts[command.abbreviation] = self._agent_counts.get(command.abbreviation, 0) + 1
+
+        with self._executions_lock:
+            self._running_executions[ctx.execution_id] = ctx
+
+        # Prepare log file path
+        log_path = self._prepare_command_log_path(command, ctx)
+        ctx.log_file = log_path
+
+        # Create task file BEFORE execution
+        task_path = self.task_manager.create_command_task_file(ctx, command)
+        ctx.task_file = task_path
+
+        try:
+            logger.info(f"Starting command execution: {command.abbreviation} (ID: {ctx.execution_id})")
+
+            # Execute command using CommandRunner
+            import logging
+            cmd_logger = logging.getLogger(__name__)
+            command_runner = CommandRunner(cmd_logger, self.config)
+            result = command_runner.run_command(command.command, command.arguments, None)
+
+            if result:
+                ctx.status = 'completed'
+                logger.info(f"Completed command execution: {command.abbreviation} (ID: {ctx.execution_id})")
+            else:
+                ctx.status = 'failed'
+                ctx.error_message = "Command returned False"
+                logger.error(f"Failed command execution: {command.abbreviation} (ID: {ctx.execution_id})")
+
+        except Exception as e:
+            ctx.status = 'failed'
+            ctx.error_message = str(e)
+            logger.error(f"Failed command execution: {command.abbreviation} (ID: {ctx.execution_id}): {e}")
+
+        finally:
+            ctx.end_time = datetime.now()
+
+            # Update task file with final status
+            if ctx.task_file:
+                self.task_manager.update_task_status(
+                    task_path=ctx.task_file,
+                    status="PROCESSED" if ctx.status == 'completed' else "FAILED",
+                    output=None,  # Commands may not produce output files
+                    error_message=ctx.error_message
+                )
+
+            # Decrement counters
+            with self._count_lock:
+                self._running_count -= 1
+
+            with self._agent_lock:
+                self._agent_counts[command.abbreviation] -= 1
 
             with self._executions_lock:
                 del self._running_executions[ctx.execution_id]
@@ -478,6 +569,31 @@ class ExecutionManager:
         log_name = agent.log_pattern.format(
             timestamp=ctx.start_time.strftime('%Y-%m-%d-%H%M%S'),
             agent=agent.abbreviation,
+            execution_id=ctx.execution_id
+        )
+
+        # Get logs directory from config
+        logs_dir = self.config.get_orchestrator_logs_dir()
+        log_path = self.vault_path / logs_dir / log_name
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        return log_path
+
+    def _prepare_command_log_path(self, command: CommandDefinition, ctx: ExecutionContext) -> Path:
+        """
+        Prepare log file path for command execution.
+
+        Args:
+            command: CommandDefinition
+            ctx: Execution context
+
+        Returns:
+            Path to log file
+        """
+        # Format log pattern
+        log_name = command.log_pattern.format(
+            timestamp=ctx.start_time.strftime('%Y-%m-%d-%H%M%S'),
+            command=command.abbreviation,
             execution_id=ctx.execution_id
         )
 

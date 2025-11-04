@@ -102,6 +102,63 @@ class TaskFileManager:
             logger.error(f"Failed to create task file: {e}")
             return None
 
+    def create_command_task_file(
+        self,
+        ctx: ExecutionContext,
+        command: 'CommandDefinition',
+        initial_status: str = "IN_PROGRESS"
+    ) -> Optional[Path]:
+        """
+        Create a task tracking file for command execution.
+
+        Args:
+            ctx: Execution context
+            command: CommandDefinition
+            initial_status: Initial task status (default: IN_PROGRESS)
+
+        Returns:
+            Path to created task file, or None if task creation disabled
+        """
+        if not command.task_create:
+            logger.debug(f"Task file creation disabled for command {command.abbreviation}")
+            return None
+
+        try:
+            # Generate task filename
+            timestamp = ctx.start_time.strftime('%Y-%m-%d')
+            filename = f"{timestamp} {command.abbreviation} - {command.command}"
+            filename = self._truncate_filename_to_bytes(filename + ".md", max_bytes=250)
+
+            task_path = self.tasks_dir / filename
+
+            # Get generation log link
+            log_link = ""
+            if ctx.log_file:
+                # Make relative to vault for wiki link
+                try:
+                    rel_log = ctx.log_file.relative_to(self.vault_path)
+                    log_link = f"[[{rel_log.parent}/{rel_log.stem}]]"
+                except ValueError:
+                    log_link = f"[[{ctx.log_file}]]"
+
+            # Create task content
+            task_content = self._build_command_task_content(
+                command=command,
+                ctx=ctx,
+                log_link=log_link,
+                initial_status=initial_status
+            )
+
+            # Write task file
+            task_path.write_text(task_content, encoding='utf-8')
+            logger.info(f"Created command task file: {task_path.name}")
+
+            return task_path
+
+        except Exception as e:
+            logger.error(f"Failed to create command task file: {e}")
+            return None
+
     def update_task_status(
         self,
         task_path: Path,
@@ -284,6 +341,64 @@ Target file: `[[{input_file_path}]]`
 
 ## Evaluation Log
 
+"""
+
+        return frontmatter + "\n" + body
+
+    def _build_command_task_content(
+        self,
+        command: 'CommandDefinition',
+        ctx: ExecutionContext,
+        log_link: str,
+        initial_status: str = "IN_PROGRESS"
+    ) -> str:
+        """
+        Build task file content for command execution.
+
+        Args:
+            command: CommandDefinition
+            ctx: Execution context
+            log_link: Wiki link to execution log
+            initial_status: Initial task status
+
+        Returns:
+            Task file content
+        """
+        # Build frontmatter
+        created_time = ctx.start_time.isoformat() if ctx.start_time else datetime.now().isoformat()
+
+        frontmatter = f"""---
+title: "{command.abbreviation} - {command.command}"
+created: {created_time}
+archived: {str(command.task_archived).lower()}
+status: "{initial_status}"
+priority: "{command.task_priority}"
+task_type: "{command.abbreviation}"
+command: "{command.command}"
+execution_log: "{log_link}"
+---"""
+
+        # Build body
+        event_type = ctx.trigger_data.get('event_type', 'scheduled')
+        event_desc = f"{event_type.capitalize()} event triggered {command.name}"
+
+        body = f"""
+## Command
+`{command.command}`
+
+## Status
+{initial_status}
+
+## Trigger
+{event_desc}
+
+## Logs
+{log_link}
+
+## Process Log
+
+## Output
+Command output will be logged to the execution log file.
 """
 
         return frontmatter + "\n" + body

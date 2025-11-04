@@ -254,14 +254,15 @@ class Orchestrator:
             'frontmatter': trigger_event.frontmatter
         }
 
-        # Find matching agents
+        # Find matching agents and commands
         matching_agents = self.agent_registry.find_matching_agents(event_data)
+        matching_commands = self.agent_registry.find_matching_commands(event_data)
 
-        if not matching_agents:
-            logger.debug(f"No agents match event: {trigger_event.path}")
+        if not matching_agents and not matching_commands:
+            logger.debug(f"No agents or commands match event: {trigger_event.path}")
             return
 
-        logger.info(f"Found {len(matching_agents)} matching agent(s) for {trigger_event.path}")
+        logger.info(f"Found {len(matching_agents)} matching agent(s) and {len(matching_commands)} matching command(s) for {trigger_event.path}")
 
         # Execute each matching agent
         for agent in matching_agents:
@@ -320,6 +321,25 @@ class Orchestrator:
             )
             execution_thread.start()
 
+        # Execute each matching command
+        for command in matching_commands:
+            # Try to reserve a slot atomically
+            if not self.execution_manager.reserve_slot(command):
+                logger.info(f"Queued {command.abbreviation}: concurrency limit reached")
+                # TODO: Add QUEUED task creation for commands if needed
+                continue
+
+            # Log command start
+            logger.info(f"Starting {command.abbreviation}: {command.command}")
+
+            # Execute in background thread (slot already reserved)
+            execution_thread = threading.Thread(
+                target=self._execute_command,
+                args=(command, event_data, True),  # slot_reserved=True
+                daemon=True
+            )
+            execution_thread.start()
+
     def _execute_agent(self, agent, event_data, slot_reserved=False):
         """
         Execute an agent task.
@@ -343,6 +363,30 @@ class Orchestrator:
 
         except Exception as e:
             logger.error(f"{agent.abbreviation} error: {e}", exc_info=True)
+
+    def _execute_command(self, command, event_data, slot_reserved=False):
+        """
+        Execute a command task.
+
+        Args:
+            command: CommandDefinition to execute
+            event_data: Event data dictionary
+            slot_reserved: Whether slot was already reserved
+        """
+        try:
+            ctx = self.execution_manager.execute_command(command, event_data, slot_reserved=slot_reserved)
+
+            if ctx.success:
+                logger.info(f"{command.abbreviation} completed ({ctx.duration:.1f}s)")
+            else:
+                duration_str = f"{ctx.duration:.1f}s" if ctx.duration else "unknown"
+                error_msg = f"{command.abbreviation} failed: {ctx.status} ({duration_str})"
+                if ctx.error_message:
+                    error_msg += f" - {ctx.error_message}"
+                logger.error(error_msg)
+
+        except Exception as e:
+            logger.error(f"{command.abbreviation} error: {e}", exc_info=True)
 
     def _process_queued_tasks(self):
         """

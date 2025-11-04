@@ -38,6 +38,14 @@ nodes:
       - AI/Research
     output_path: AI/Sharable
 
+  # Sync Limitless Data (scheduled command)
+  - type: command
+    name: Sync Limitless (SL)
+    command: sync-limitless
+    cron: "*/5 * * * *"  # Every 5 minutes
+    output_path: Ingest/Limitless
+    task_create: false  # Disable task files for frequent jobs
+
   # Batch workflow support is TBA
   # # Generate Daily Roundup
   # - type: agent

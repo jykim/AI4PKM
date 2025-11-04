@@ -59,10 +59,48 @@ class AgentDefinition:
 
 
 @dataclass
+class CommandDefinition:
+    """Represents a command that executes Python code directly."""
+    # Basic identity
+    name: str
+    abbreviation: str
+    category: str  # ingestion, publish, research
+
+    # Command execution
+    command: str  # e.g., "sync-limitless"
+    arguments: Dict[str, Any] = field(default_factory=dict)
+
+    # Trigger specification
+    trigger_schedule: Optional[str] = None
+    cron: Optional[str] = None  # Cron expression for scheduled triggers
+
+    # Output (for task file creation)
+    output_path: str = ""
+
+    # Execution
+    timeout_minutes: int = 30
+    max_parallel: int = 1
+
+    # Task file configuration
+    task_create: bool = True  # Whether to create task tracking files
+    task_priority: str = "medium"  # low, medium, high
+    task_archived: bool = False  # Default archived status
+
+    # Logging
+    log_prefix: str = ""
+    log_pattern: str = "{timestamp}-{command}.log"
+
+    # Metadata
+    version: str = "1.0"
+    last_updated: Optional[datetime] = None
+
+
+@dataclass
 class ExecutionContext:
-    """Context for a single agent execution."""
+    """Context for a single agent or command execution."""
     execution_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     agent: Optional[AgentDefinition] = None
+    command: Optional[CommandDefinition] = None
     trigger_data: Dict[str, Any] = field(default_factory=dict)
 
     start_time: Optional[datetime] = None

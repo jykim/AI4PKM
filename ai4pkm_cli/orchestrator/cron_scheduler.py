@@ -79,7 +79,7 @@ class CronScheduler:
 
     def _check_and_trigger_jobs(self):
         """
-        Check if any agents with cron expressions should be triggered now.
+        Check if any agents or commands with cron expressions should be triggered now.
         """
         now = datetime.now()
 
@@ -89,9 +89,16 @@ class CronScheduler:
             if agent.cron is not None
         ]
 
-        if not agents_with_cron:
+        # Get all commands with cron expressions
+        commands_with_cron = [
+            command for command in self.agent_registry.commands.values()
+            if command.cron is not None
+        ]
+
+        if not agents_with_cron and not commands_with_cron:
             return
 
+        # Check agents
         for agent in agents_with_cron:
             print(agent.cron)
             try:
@@ -106,6 +113,22 @@ class CronScheduler:
                     self._trigger_agent(agent)
             except Exception as e:
                 logger.error(f"Error checking cron for agent {agent.abbreviation}: {e}")
+
+        # Check commands
+        for command in commands_with_cron:
+            print(command.cron)
+            try:
+                # Check if this command's cron expression should trigger now
+                cron = croniter(command.cron, now)
+                prev_run = cron.get_prev(datetime)
+
+                # If the previous run time is within the last minute, trigger the job
+                time_diff = (now - prev_run).total_seconds()
+                if 0 <= time_diff < 60:
+                    logger.info(f"Triggering scheduled command: {command.abbreviation} ({command.name})")
+                    self._trigger_command(command)
+            except Exception as e:
+                logger.error(f"Error checking cron for command {command.abbreviation}: {e}")
 
     def _trigger_agent(self, agent):
         """
@@ -126,4 +149,24 @@ class CronScheduler:
         # Queue the event for processing
         self.event_queue.put(trigger_event)
         logger.debug(f"Queued scheduled event for agent: {agent.abbreviation}")
+
+    def _trigger_command(self, command):
+        """
+        Create a synthetic TriggerEvent for a scheduled command and queue it.
+
+        Args:
+            command: CommandDefinition with cron expression
+        """
+        # Create synthetic TriggerEvent for scheduled execution
+        trigger_event = TriggerEvent(
+            path="",  # No file path for scheduled events
+            event_type="scheduled",
+            is_directory=False,
+            timestamp=datetime.now(),
+            frontmatter={}
+        )
+
+        # Queue the event for processing
+        self.event_queue.put(trigger_event)
+        logger.debug(f"Queued scheduled event for command: {command.abbreviation}")
 
