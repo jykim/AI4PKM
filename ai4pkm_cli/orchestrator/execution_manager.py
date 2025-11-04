@@ -309,7 +309,7 @@ class ExecutionManager:
         ctx.prompt = self._build_prompt(agent, trigger_data)
         self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', 'exec', '--full-auto', ctx.prompt], agent.timeout_minutes * 60)
 
-    def _execute_subprocess(self, ctx: ExecutionContext, agnet_name: str, cmd: List[str], timeout_seconds: int, input: Optional[str] = None):
+    def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int, input: Optional[str] = None):
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE if input else subprocess.DEVNULL,
@@ -326,7 +326,7 @@ class ExecutionManager:
         logs = []
         def stream_stderr(proc):
             for line in proc.stdout:
-                logs.append(f"[{agnet_name}] {line.rstrip("\n")}")
+                logs.append(f"[{agent_name}] {line.strip()}")
                 logger.info(logs[-1])
 
         stderr_thread = threading.Thread(target=stream_stderr, args=(process,))
@@ -336,14 +336,14 @@ class ExecutionManager:
             process.wait(timeout=timeout_seconds)
         except subprocess.TimeoutExpired:
             process.kill()
-            raise RuntimeError(f"{agnet_name} timed out after {timeout_seconds} seconds")
+            raise RuntimeError(f"{agent_name} timed out after {timeout_seconds} seconds")
         finally:
             stderr_thread.join()
 
         
         if process.returncode != 0:
             ctx.error_message = "\n".join(logs)
-            raise RuntimeError(f"{agnet_name} execution failed")
+            raise RuntimeError(f"{agent_name} execution failed")
         else:
             ctx.response = "\n".join(logs)
 
