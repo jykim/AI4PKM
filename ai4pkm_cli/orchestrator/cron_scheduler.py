@@ -100,7 +100,7 @@ class CronScheduler:
 
         # Check agents
         for agent in agents_with_cron:
-            print(agent.cron)
+            logger.debug(f"Checking cron job: {agent.name} ({agent.cron})")
             try:
                 # Check if this agent's cron expression should trigger now
                 cron = croniter(agent.cron, now)
@@ -116,7 +116,7 @@ class CronScheduler:
 
         # Check commands
         for command in commands_with_cron:
-            print(command.cron)
+            logger.debug(f"Checking cron job: {command.name} ({command.cron})")
             try:
                 # Check if this command's cron expression should trigger now
                 cron = croniter(command.cron, now)
