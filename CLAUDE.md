@@ -88,3 +88,28 @@ Documentation changes still require explicit approval before committing.
 **User approval must be EXPLICIT, not IMPLIED.**
 
 When in doubt, ask for clarification rather than assuming approval.
+
+## Technical Lessons Learned
+
+### Preventive vs Reactive Fixes
+
+**Prefer preventing problems over detecting them.** When constraints are well-defined (filesystem limits, API specs), prevent issues proactively. Use reactive solutions only when constraints are unpredictable (network, external systems).
+
+### macOS Filename Byte Limit
+
+**Problem**: macOS limits filenames to 255 **bytes** (not characters). Korean/Japanese text uses 3 bytes/char, causing silent truncation.
+
+**Solution**: Calculate UTF-8 byte length before file creation and truncate proactively:
+
+```python
+def truncate_filename_to_bytes(filename: str, max_bytes: int = 250) -> str:
+    if len(filename.encode('utf-8')) <= max_bytes:
+        return filename
+
+    path = Path(filename)
+    available = max_bytes - len(path.suffix.encode('utf-8')) - 3  # "..."
+    truncated = path.stem.encode('utf-8')[:available].decode('utf-8', errors='ignore')
+    return f"{truncated}...{path.suffix}"
+```
+
+**Fix**: [task_manager.py:148-210](ai4pkm_cli/orchestrator/task_manager.py#L148-L210)

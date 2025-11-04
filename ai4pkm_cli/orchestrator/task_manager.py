@@ -145,6 +145,45 @@ class TaskFileManager:
         except Exception as e:
             logger.error(f"Failed to update task file: {e}")
 
+    def _truncate_filename_to_bytes(self, filename: str, max_bytes: int = 250) -> str:
+        """
+        Truncate filename to fit within byte limit (for filesystem compatibility).
+
+        macOS/HFS+ has a 255-byte filename limit. Since UTF-8 characters can be 1-4 bytes,
+        we need to truncate based on byte length, not character count.
+
+        Args:
+            filename: Original filename (including extension)
+            max_bytes: Maximum byte length (default 250 for safety margin)
+
+        Returns:
+            Truncated filename that fits within byte limit
+        """
+        # Split into stem and extension
+        path = Path(filename)
+        stem = path.stem
+        ext = path.suffix
+
+        # Calculate current byte length
+        current_bytes = len(filename.encode('utf-8'))
+
+        if current_bytes <= max_bytes:
+            return filename
+
+        # Need to truncate - calculate how many bytes we need to remove
+        ext_bytes = len(ext.encode('utf-8'))
+        ellipsis = "..."
+        ellipsis_bytes = len(ellipsis.encode('utf-8'))
+
+        # Available bytes for stem (accounting for extension and ellipsis)
+        available_bytes = max_bytes - ext_bytes - ellipsis_bytes
+
+        # Truncate stem byte by byte until it fits
+        stem_encoded = stem.encode('utf-8')
+        truncated_stem = stem_encoded[:available_bytes].decode('utf-8', errors='ignore')
+
+        return f"{truncated_stem}{ellipsis}{ext}"
+
     def _generate_task_filename(self, ctx: ExecutionContext, agent: AgentDefinition) -> str:
         """
         Generate task filename: YYYY-MM-DD {agent_abbr} - {input_filename}.md
@@ -154,7 +193,7 @@ class TaskFileManager:
             agent: Agent definition
 
         Returns:
-            Task filename
+            Task filename (truncated to fit macOS 255-byte limit)
         """
         date_str = ctx.start_time.strftime('%Y-%m-%d') if ctx.start_time else datetime.now().strftime('%Y-%m-%d')
 
@@ -165,7 +204,10 @@ class TaskFileManager:
         else:
             input_name = ctx.execution_id[:8]  # Fallback to execution ID
 
-        return f"{date_str} {agent.abbreviation} - {input_name}.md"
+        filename = f"{date_str} {agent.abbreviation} - {input_name}.md"
+
+        # Truncate if needed to fit macOS 255-byte filename limit
+        return self._truncate_filename_to_bytes(filename, max_bytes=250)
 
     def _build_task_content(
         self,
