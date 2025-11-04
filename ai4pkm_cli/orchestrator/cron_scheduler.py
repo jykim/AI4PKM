@@ -93,7 +93,7 @@ class CronScheduler:
             return
 
         for agent in agents_with_cron:
-            print(agent.cron)
+            logger.debug(f"Checking cron job: {agent.name} ({agent.cron})")
             try:
                 # Check if this agent's cron expression should trigger now
                 cron = croniter(agent.cron, now)
@@ -106,7 +106,6 @@ class CronScheduler:
                     self._trigger_agent(agent)
             except Exception as e:
                 logger.error(f"Error checking cron for agent {agent.abbreviation}: {e}")
-
     def _trigger_agent(self, agent):
         """
         Create a synthetic TriggerEvent for a scheduled agent and queue it.
