@@ -197,8 +197,6 @@ class ExecutionManager:
                 self._execute_gemini_cli(agent, ctx, trigger_data)
             elif agent.executor == 'codex_cli':
                 self._execute_codex_cli(agent, ctx, trigger_data)
-            elif agent.executor == 'custom_script':
-                self._execute_custom_script(agent, ctx, trigger_data)
             else:
                 raise ValueError(f"Unknown executor: {agent.executor}")
 
@@ -207,12 +205,10 @@ class ExecutionManager:
 
         except subprocess.TimeoutExpired:
             ctx.status = 'timeout'
-            ctx.error_message = f"Execution timed out after {agent.timeout_minutes} minutes"
             logger.error(f"Timeout: {agent.abbreviation} (ID: {ctx.execution_id})")
 
         except Exception as e:
             ctx.status = 'failed'
-            ctx.error_message = str(e)
             logger.error(f"Failed execution: {agent.abbreviation} (ID: {ctx.execution_id}): {e}")
 
         finally:
@@ -234,8 +230,7 @@ class ExecutionManager:
                     # If validation failed, mark as FAILED
                     if not output_valid:
                         final_status = 'failed'
-                        if not ctx.error_message:
-                            ctx.error_message = validation_error
+                        ctx.error_message = validation_error
 
                 self.task_manager.update_task_status(
                     task_path=ctx.task_file,
@@ -247,6 +242,18 @@ class ExecutionManager:
             # Post-processing actions (e.g., remove trigger content)
             if ctx.status == 'completed' and agent.post_process_action:
                 self._apply_post_processing(agent, trigger_data)
+
+            # Log result to file
+            if ctx.log_file:
+                with open(ctx.log_file, 'w', encoding='utf-8') as f:
+                    f.write(f"# Execution Log: {agent.abbreviation}\n")
+                    f.write(f"# Start: {ctx.start_time}\n")
+                    f.write(f"# Execution ID: {ctx.execution_id}\n")
+                    f.write(f"# Status: {ctx.status}\n")
+                    f.write(f"# Prompt:\n{ctx.prompt}\n\n")
+                    f.write(f"# Response:\n{ctx.response}\n\n")
+                    if ctx.error_message:
+                        f.write(f"# Error Message:\n{ctx.error_message}\n\n")
 
             # Decrement counters
             with self._count_lock:
@@ -273,59 +280,8 @@ class ExecutionManager:
             raise RuntimeError("Claude CLI not found. Install Claude Code from https://claude.com/claude-code")
 
         # Build prompt from agent definition
-        prompt = self._build_prompt(agent, trigger_data)
-
-        # Prepare log file path
-        log_path = self._prepare_log_path(agent, ctx)
-
-        # Execute using Claude Code CLI
-        try:
-            # Build command
-            cmd = [
-                CLAUDE_CLI_PATH,
-                "--permission-mode", "bypassPermissions",
-            ]
-
-            logger.info(f"🚀 Executing Claude CLI for {agent.abbreviation}: {' '.join(cmd[:2])}")
-
-            # Execute Claude CLI with timeout
-            timeout_seconds = agent.timeout_minutes * 60
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                cwd=str(self.vault_path)
-            )
-
-            if result.returncode != 0:
-                logger.error(f"Claude CLI failed with code {result.returncode}")
-                logger.error(f"STDERR: {result.stderr}")
-                raise RuntimeError(f"Claude CLI execution failed: {result.stderr}")
-
-            # Log output
-            if result.stdout:
-                logger.info(f"✅ Claude response received for {agent.abbreviation}")
-
-            ctx.output = result.stdout
-
-            # Log result to file
-            if log_path:
-                log_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(log_path, 'w', encoding='utf-8') as f:
-                    f.write(f"# Execution Log: {agent.abbreviation}\n")
-                    f.write(f"# Start: {ctx.start_time}\n")
-                    f.write(f"# Execution ID: {ctx.execution_id}\n\n")
-                    f.write(f"## Prompt\n\n{prompt}\n\n")
-                    f.write(f"## Response\n\n{result.stdout}\n")
-
-        except subprocess.TimeoutExpired:
-            logger.error(f"Claude CLI execution timed out after {agent.timeout_minutes} minutes")
-            raise
-        except Exception as e:
-            logger.error(f"Claude CLI execution failed: {e}")
-            raise RuntimeError(f"Claude CLI execution failed: {e}")
+        ctx.prompt = self._build_prompt(agent, trigger_data)
+        self._execute_subprocess(ctx, 'Claude CLI', [CLAUDE_CLI_PATH, '--permission-mode', 'bypassPermissions'], agent.timeout_minutes * 60, ctx.prompt)
 
     def _execute_gemini_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -337,30 +293,8 @@ class ExecutionManager:
             trigger_data: Trigger event data
         """
         # Build prompt
-        prompt = self._build_prompt(agent, trigger_data)
-
-        # Prepare log file path
-        log_path = self._prepare_log_path(agent, ctx)
-
-        # Execute Gemini CLI
-        cmd = [
-            'gemini',
-            '--prompt', prompt,
-            '--vault', str(self.vault_path),
-        ]
-
-        timeout_seconds = agent.timeout_minutes * 60
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            cwd=self.vault_path
-        )
-
-        ctx.output = result.stdout
-        if result.returncode != 0:
-            raise RuntimeError(f"Gemini CLI execution failed: {result.stderr}")
+        ctx.prompt = self._build_prompt(agent, trigger_data)
+        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo', '--debug', '--prompt', ctx.prompt], agent.timeout_minutes * 60)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -372,66 +306,47 @@ class ExecutionManager:
             trigger_data: Trigger event data
         """
         # Build prompt
-        prompt = self._build_prompt(agent, trigger_data)
+        ctx.prompt = self._build_prompt(agent, trigger_data)
+        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', 'exec', '--full-auto', ctx.prompt], agent.timeout_minutes * 60)
 
-        # Prepare log file path
-        log_path = self._prepare_log_path(agent, ctx)
-
-        # Execute Codex CLI using correct structure from KTM code
-        cmd = ['codex']
-        cmd.append('--search')      # Global flag
-        cmd.append('exec')          # Subcommand
-        cmd.append('--full-auto')   # Exec-specific flag
-        cmd.append(prompt)          # Prompt as positional argument
-
-        timeout_seconds = agent.timeout_minutes * 60
-        result = subprocess.run(
+    def _execute_subprocess(self, ctx: ExecutionContext, agnet_name: str, cmd: List[str], timeout_seconds: int, input: Optional[str] = None):
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdin=subprocess.PIPE if input else subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            timeout=timeout_seconds,
-            cwd=self.vault_path  # Run in vault directory
+            cwd=str(self.vault_path)
         )
 
-        ctx.output = result.stdout
-        if result.returncode != 0:
-            raise RuntimeError(f"Codex CLI execution failed: {result.stderr}")
+        if input:
+            process.stdin.write(input)
+            process.stdin.close()
+        
+        logs = []
+        def stream_stderr(proc):
+            for line in proc.stdout:
+                logs.append(f"[{agnet_name}] {line.rstrip("\n")}")
+                logger.info(logs[-1])
 
-    def _execute_custom_script(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
-        """
-        Execute custom script.
+        stderr_thread = threading.Thread(target=stream_stderr, args=(process,))
+        stderr_thread.start()
 
-        Args:
-            agent: Agent definition
-            ctx: Execution context
-            trigger_data: Trigger event data
-        """
-        # Custom scripts should be in _Settings_/Scripts/
-        script_path = self.vault_path / "_Settings_" / "Scripts" / f"{agent.abbreviation}.py"
+        try:
+            process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise RuntimeError(f"{agnet_name} timed out after {timeout_seconds} seconds")
+        finally:
+            stderr_thread.join()
 
-        if not script_path.exists():
-            raise FileNotFoundError(f"Custom script not found: {script_path}")
+        
+        if process.returncode != 0:
+            ctx.error_message = "\n".join(logs)
+            raise RuntimeError(f"{agnet_name} execution failed")
+        else:
+            ctx.response = "\n".join(logs)
 
-        # Execute custom script
-        cmd = ['python', str(script_path)]
-
-        # Pass trigger data as JSON via stdin
-        import json
-        trigger_json = json.dumps(trigger_data)
-
-        timeout_seconds = agent.timeout_minutes * 60
-        result = subprocess.run(
-            cmd,
-            input=trigger_json,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-            cwd=self.vault_path
-        )
-
-        ctx.output = result.stdout
-        if result.returncode != 0:
-            raise RuntimeError(f"Custom script execution failed: {result.stderr}")
 
     def _build_prompt(self, agent: AgentDefinition, trigger_data: Dict) -> str:
         """
@@ -517,7 +432,7 @@ class ExecutionManager:
         if agent.output_type == "new_file":
             output_dir = self.vault_path / agent.output_path
             if not output_dir.exists():
-                return False, None, f"Output directory does not exist: {agent.output_path}"
+                output_dir.mkdir(parents=True, exist_ok=True)
 
             # Look for markdown files created/modified after execution started
             start_time = ctx.start_time.timestamp() - 5 if ctx.start_time else 0

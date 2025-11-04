@@ -70,9 +70,9 @@ class ExecutionContext:
 
     # Execution results
     status: str = "pending"  # pending, completed, failed, timeout
-    output: Optional[str] = None
+    prompt: Optional[str] = None
     error_message: Optional[str] = None
-    result: Optional[Dict] = None
+    response: Optional[str] = None
 
     # File paths
     log_file: Optional[Path] = None

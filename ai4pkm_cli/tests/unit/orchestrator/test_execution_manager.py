@@ -207,37 +207,3 @@ class TestExecutionManager:
         assert log_path.parent.exists()
         assert log_path.parent.name == "Logs"
         assert "TST" in log_path.name
-
-    @patch('subprocess.run')
-    def test_custom_script_execution(self, mock_run, temp_vault):
-        """Test custom script execution."""
-        mock_run.return_value = Mock(returncode=0, stdout="Script output", stderr="")
-
-        # Create custom script
-        scripts_dir = temp_vault / "_Settings_" / "Scripts"
-        scripts_dir.mkdir(parents=True)
-        script_file = scripts_dir / "CST.py"
-        script_file.write_text("print('Hello')", encoding='utf-8')
-
-        agent = AgentDefinition(
-            name="Custom Agent",
-            abbreviation="CST",
-            category="research",
-            trigger_pattern="*.md",
-            trigger_event="created",
-            prompt_body="",
-            executor="custom_script"
-        )
-
-        manager = ExecutionManager(temp_vault, max_concurrent=3)
-        trigger_data = {'path': 'test.md', 'event_type': 'created'}
-
-        ctx = manager.execute(agent, trigger_data)
-
-        assert ctx.status == 'completed'
-        assert mock_run.called
-
-        # Check that python was called with script path
-        cmd = mock_run.call_args[0][0]
-        assert 'python' in cmd[0]
-        assert 'CST.py' in cmd[1]
