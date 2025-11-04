@@ -231,6 +231,17 @@ class AgentRegistry:
 
         output_path = node.get('output_path', '')
         output_type = node.get('output_type', 'new_file')
+
+        # Validate output_type
+        valid_output_types = ['new_file', 'update_file', '']
+        if output_type and output_type not in valid_output_types:
+            logger.error(
+                f"Invalid output_type '{output_type}' for agent {frontmatter.get('abbreviation', 'unknown')} "
+                f"in {file_path}. Valid types: {valid_output_types}"
+            )
+            logger.warning(f"Defaulting to 'new_file' for agent {frontmatter.get('abbreviation', 'unknown')}")
+            output_type = 'new_file'
+
         input_pattern = node.get('input_pattern')
 
         # Derive trigger_pattern and trigger_event
