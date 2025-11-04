@@ -243,7 +243,7 @@ class Orchestrator:
         Args:
             trigger_event: Trigger event to process (file or scheduled)
         """
-        logger.info(f"Processing event: {trigger_event.event_type} {trigger_event.path}")
+        logger.debug(f"Processing event: {trigger_event.event_type} {trigger_event.path}")
 
         # Convert TriggerEvent to event_data dict
         event_data = {
