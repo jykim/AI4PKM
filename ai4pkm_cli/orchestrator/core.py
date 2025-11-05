@@ -309,7 +309,9 @@ class Orchestrator:
                 logger.info(f"Queued {agent.abbreviation}: concurrency limit reached")
                 continue
 
-            # Log agent start
+            # Log agent trigger at INFO level for visibility
+            input_filename = Path(trigger_event.path).name if trigger_event.path else "scheduled"
+            logger.info(f"Triggering {trigger_event.event_type} agent: {agent.abbreviation} ({input_filename})")
             logger.debug(f"Starting {agent.abbreviation}: {trigger_event.path}")
 
             # Execute in background thread (slot already reserved)
@@ -333,7 +335,7 @@ class Orchestrator:
             ctx = self.execution_manager.execute(agent, event_data, slot_reserved=slot_reserved)
 
             if ctx.success:
-                logger.debug(f"{agent.abbreviation} completed ({ctx.duration:.1f}s)")
+                logger.info(f"{agent.abbreviation} completed ({ctx.duration:.1f}s)")
             else:
                 duration_str = f"{ctx.duration:.1f}s" if ctx.duration else "unknown"
                 error_msg = f"{agent.abbreviation} failed: {ctx.status} ({duration_str})"
