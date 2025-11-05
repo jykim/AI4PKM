@@ -94,7 +94,7 @@ class TaskFileManager:
 
             # Write task file
             task_path.write_text(task_content, encoding='utf-8')
-            logger.info(f"Created task file: {task_path.name}")
+            logger.debug(f"Created task file: {task_path.name}")
 
             return task_path
 
