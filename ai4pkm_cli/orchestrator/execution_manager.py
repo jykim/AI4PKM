@@ -418,7 +418,7 @@ class ExecutionManager:
         def stream_stderr(proc):
             for line in proc.stdout:
                 logs.append(f"[{agent_name}] {line.strip()}")
-                logger.info(logs[-1])
+                logger.debug(logs[-1])
 
         stderr_thread = threading.Thread(target=stream_stderr, args=(process,))
         stderr_thread.start()
