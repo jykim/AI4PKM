@@ -192,7 +192,7 @@ class ExecutionManager:
         ctx.task_file = task_path
 
         try:
-            logger.info(f"Starting execution: {agent.abbreviation} (ID: {ctx.execution_id})")
+            logger.debug(f"Starting execution: {agent.abbreviation} (ID: {ctx.execution_id})")
 
             # Execute based on executor type
             if agent.executor == 'claude_code':
@@ -313,7 +313,7 @@ class ExecutionManager:
         ctx.task_file = task_path
 
         try:
-            logger.info(f"Starting command execution: {command.abbreviation} (ID: {ctx.execution_id})")
+            logger.debug(f"Starting command execution: {command.abbreviation} (ID: {ctx.execution_id})")
 
             # Execute command using CommandRunner
             import logging
@@ -323,7 +323,7 @@ class ExecutionManager:
 
             if result:
                 ctx.status = 'completed'
-                logger.info(f"Completed command execution: {command.abbreviation} (ID: {ctx.execution_id})")
+                logger.debug(f"Completed command execution: {command.abbreviation} (ID: {ctx.execution_id})")
             else:
                 ctx.status = 'failed'
                 ctx.error_message = "Command returned False"
