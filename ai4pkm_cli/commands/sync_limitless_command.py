@@ -39,7 +39,7 @@ class SyncLimitlessCommand:
     @property
     def is_debug(self):
         """Check if logger is in debug mode."""
-        return self.logger.level <= logging.DEBUG
+        return logging.getLogger().getEffectiveLevel() <= logging.DEBUG
 
     def run_sync(self):
         """
