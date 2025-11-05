@@ -243,7 +243,7 @@ class Orchestrator:
         Args:
             trigger_event: Trigger event to process (file or scheduled)
         """
-        logger.info(f"Processing event: {trigger_event.event_type} {trigger_event.path}")
+        logger.debug(f"Processing event: {trigger_event.event_type} {trigger_event.path}")
 
         # Convert TriggerEvent to event_data dict
         event_data = {
@@ -261,7 +261,7 @@ class Orchestrator:
             logger.debug(f"No agents match event: {trigger_event.path}")
             return
 
-        logger.info(f"Found {len(matching_agents)} matching agent(s) for {trigger_event.path}")
+        logger.debug(f"Found {len(matching_agents)} matching agent(s) for {trigger_event.path}")
 
         # Execute each matching agent
         for agent in matching_agents:
@@ -309,8 +309,10 @@ class Orchestrator:
                 logger.info(f"Queued {agent.abbreviation}: concurrency limit reached")
                 continue
 
-            # Log agent start
-            logger.info(f"Starting {agent.abbreviation}: {trigger_event.path}")
+            # Log agent trigger at INFO level for visibility
+            input_filename = Path(trigger_event.path).name if trigger_event.path else "scheduled"
+            logger.info(f"Triggering {trigger_event.event_type} agent: {agent.abbreviation} ({input_filename})")
+            logger.debug(f"Starting {agent.abbreviation}: {trigger_event.path}")
 
             # Execute in background thread (slot already reserved)
             execution_thread = threading.Thread(
@@ -401,7 +403,7 @@ class Orchestrator:
 
                 # Execute agent (slot already reserved)
                 event_path = event_data.get('path', '')
-                logger.info(f"Starting queued {agent.abbreviation}: {event_path}")
+                logger.debug(f"Starting queued {agent.abbreviation}: {event_path}")
 
                 execution_thread = threading.Thread(
                     target=self._execute_agent,
