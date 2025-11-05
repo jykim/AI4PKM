@@ -188,7 +188,7 @@ class ExecutionManager:
         ctx.task_file = task_path
 
         try:
-            logger.info(f"Starting execution: {agent.abbreviation} (ID: {ctx.execution_id})")
+            logger.debug(f"Starting execution: {agent.abbreviation} (ID: {ctx.execution_id})")
 
             # Execute based on executor type
             if agent.executor == 'claude_code':
