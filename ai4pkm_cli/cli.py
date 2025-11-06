@@ -890,6 +890,9 @@ class PKMApp:
             f"  [cyan]ai4pkm -r[/cyan]                     Run a cron job once"
         )
         self.console.print(
+            f"  [cyan]ai4pkm -t[/cyan]                     Trigger orchestrator agent"
+        )
+        self.console.print(
             f"  [cyan]ai4pkm --list-agents[/cyan]          List available agents"
         )
         self.console.print(
