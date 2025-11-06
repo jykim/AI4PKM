@@ -50,18 +50,17 @@ def signal_handler(sig, frame):
     help="Test/run a specific cron job interactively once",
 )
 @click.option(
-    "-T",
+    "-t",
     "--trigger-agent",
     "trigger_agent",
     is_flag=True,
     help="Trigger an orchestrator agent interactively once",
 )
 @click.option(
-    "-t",
     "--task-management",
     "task_management",
     is_flag=True,
-    help="Run continuous task management (KTG+KTP pipeline with file monitoring)",
+    help="[DEPRECATED] Run continuous task management (KTG+KTP pipeline with file monitoring)",
 )
 @click.option(
     "-c", "--cron", "run_cron", is_flag=True, help="Run continuous cron job scheduler and web server"
