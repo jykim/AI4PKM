@@ -405,8 +405,8 @@ class PKMApp:
                     self.console.print(
                         f"[dim]Execution time: {execution_time:.2f}s[/dim]"
                     )
-                    if ctx.output_file:
-                        self.console.print(f"[dim]Output: {ctx.output_file}[/dim]")
+                    if ctx.task_file:
+                        self.console.print(f"[dim]Task file: {ctx.task_file.name}[/dim]")
                 else:
                     error_msg = ctx.error_message if ctx else "Unknown error"
                     self.logger.error(f"✗ Agent failed: {error_msg}")
