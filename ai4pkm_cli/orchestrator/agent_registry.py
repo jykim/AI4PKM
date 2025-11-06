@@ -7,9 +7,11 @@ import logging
 import json
 import re
 import yaml
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 import fnmatch
+from croniter import croniter
 
 from .models import AgentDefinition
 from ..markdown_utils import read_frontmatter, extract_body
@@ -275,6 +277,13 @@ class AgentRegistry:
         task_priority = node.get('task_priority', defaults.get('task_priority', 'medium'))
         task_archived = node.get('task_archived', defaults.get('task_archived', False))
 
+        # Infer output_optional: if no input_path, output is optional
+        # This means scheduled/manual agents can complete without producing output
+        output_optional = not bool(input_path)  # True when input_path is empty
+
+        # Get agent_params from node (explicit YAML property)
+        agent_params = node.get('agent_params', {})
+
         agent = AgentDefinition(
             name=frontmatter['title'],
             abbreviation=frontmatter['abbreviation'],
@@ -290,6 +299,7 @@ class AgentRegistry:
             input_type=input_type,
             output_path=output_path,
             output_type=output_type,
+            output_optional=output_optional,
             output_naming=node.get('output_naming', '{title} - {agent}.md'),
             prompt_body=prompt_body,
             skills=skills,
@@ -304,7 +314,8 @@ class AgentRegistry:
             task_priority=task_priority,
             task_archived=task_archived,
             file_path=file_path,
-            version=node.get('version', '1.0')
+            version=node.get('version', '1.0'),
+            agent_params=agent_params
         )
 
         return agent
@@ -391,8 +402,21 @@ class AgentRegistry:
         """
         # Handle scheduled events (cron-based)
         if event_type == 'scheduled':
-            # Match agents that have cron expression set
-            return agent.cron is not None
+            # Only match if agent has cron and current time matches the schedule
+            if agent.cron is None:
+                return False
+
+            try:
+                now = datetime.now()
+                cron = croniter(agent.cron, now)
+                prev_run = cron.get_prev(datetime)
+
+                # If the previous run time is within the last minute, this agent should trigger
+                time_diff = (now - prev_run).total_seconds()
+                return 0 <= time_diff < 60
+            except Exception as e:
+                logger.error(f"Error validating cron schedule for {agent.abbreviation}: {e}")
+                return False
 
         # Manual agents never match file events
         if agent.trigger_pattern is None or agent.trigger_event == 'manual':

@@ -231,10 +231,14 @@ class ExecutionManager:
                     if not output_valid:
                         final_status = 'failed'
                         ctx.error_message = validation_error
+                    # If validation passed but no output (optional no-output scenario)
+                    elif output_valid and output_link is None and agent.output_optional:
+                        final_status = 'ignored'
 
                 self.task_manager.update_task_status(
                     task_path=ctx.task_file,
-                    status="PROCESSED" if final_status == 'completed' else "FAILED",
+                    status="IGNORE" if final_status == 'ignored' else
+                           "PROCESSED" if final_status == 'completed' else "FAILED",
                     output=output_link,
                     error_message=ctx.error_message
                 )
@@ -389,6 +393,12 @@ class ExecutionManager:
             for key, value in trigger_data['frontmatter'].items():
                 prompt += f"- {key}: {value}\n"
 
+        # Add agent parameters if available
+        if agent.agent_params:
+            prompt += "\n# Agent Parameters\n"
+            for key, value in agent.agent_params.items():
+                prompt += f"- {key}: {value}\n"
+
         return prompt
 
     def _validate_output(self, agent: AgentDefinition, trigger_data: Dict, ctx: ExecutionContext) -> tuple:
@@ -458,7 +468,13 @@ class ExecutionManager:
                 except ValueError:
                     return True, f"[[{output_file}]]", None
             else:
-                return False, None, f"No new file found in {agent.output_path} (new_file mode)"
+                # No output files found
+                if agent.output_optional:
+                    # No output is acceptable for agents with optional output
+                    logger.info(f"No output found for {agent.abbreviation}, but output is optional")
+                    return True, None, None
+                else:
+                    return False, None, f"No new file found in {agent.output_path} (new_file mode)"
 
         # Default: no validation
         return True, f"[[{input_path_str}]]" if input_path_str else None, None

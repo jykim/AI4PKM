@@ -30,6 +30,7 @@ class AgentDefinition:
     input_type: str = "new_file"
     output_path: str = ""
     output_type: str = "new_file"
+    output_optional: bool = False  # If True, no output is acceptable (auto-inferred from input_path)
     output_naming: str = "{title} - {agent}.md"
 
     # Execution
@@ -56,6 +57,9 @@ class AgentDefinition:
     file_path: Optional[Path] = None
     version: str = "1.0"
     last_updated: Optional[datetime] = None
+
+    # Agent-specific parameters from orchestrator.yaml
+    agent_params: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -202,7 +202,9 @@ class TaskFileManager:
         if input_path:
             input_name = Path(input_path).stem
         else:
-            input_name = ctx.execution_id[:8]  # Fallback to execution ID
+            # For scheduled agents, use 'scheduled' with timestamp
+            timestamp = ctx.start_time.strftime('%H%M') if ctx.start_time else datetime.now().strftime('%H%M')
+            input_name = f'scheduled-{timestamp}'
 
         filename = f"{date_str} {agent.abbreviation} - {input_name}.md"
 
@@ -246,6 +248,16 @@ output: ""
 task_type: "{agent.abbreviation}"
 generation_log: "{log_link}"
 """
+
+        # Add agent_params if available
+        if agent.agent_params:
+            frontmatter += "agent_params:\n"
+            for key, value in agent.agent_params.items():
+                # Properly format YAML values
+                if isinstance(value, str):
+                    frontmatter += f'  {key}: "{value}"\n'
+                else:
+                    frontmatter += f'  {key}: {value}\n'
 
         # Add trigger data for QUEUED tasks
         if trigger_data_json:
