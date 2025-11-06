@@ -442,6 +442,52 @@ class Orchestrator:
             ]
         }
 
+    def trigger_agent_once(self, agent_abbreviation: str) -> Optional[ExecutionContext]:
+        """
+        Manually trigger an agent once (synchronously).
+
+        Args:
+            agent_abbreviation: Agent abbreviation (e.g., "GDR", "EIC")
+
+        Returns:
+            ExecutionContext if agent was found and executed, None otherwise
+        """
+        from datetime import datetime
+
+        # Look up agent
+        agent = self.agent_registry.agents.get(agent_abbreviation)
+        if not agent:
+            logger.error(f"Agent '{agent_abbreviation}' not found")
+            return None
+
+        logger.info(f"Manually triggering agent: {agent.abbreviation} ({agent.name})")
+
+        # Create synthetic TriggerEvent for manual execution
+        trigger_event = TriggerEvent(
+            path="",  # No file path for manual triggers
+            event_type="manual",
+            is_directory=False,
+            timestamp=datetime.now(),
+            frontmatter={}
+        )
+
+        # Convert to event data dict
+        event_data = {
+            'path': trigger_event.path,
+            'event_type': trigger_event.event_type,
+            'is_directory': trigger_event.is_directory,
+            'timestamp': trigger_event.timestamp,
+            'frontmatter': trigger_event.frontmatter
+        }
+
+        # Execute synchronously
+        try:
+            ctx = self.execution_manager.execute(agent, event_data, slot_reserved=False)
+            return ctx
+        except Exception as e:
+            logger.error(f"Error executing agent {agent_abbreviation}: {e}", exc_info=True)
+            return None
+
     def run_forever(self):
         """
         Start orchestrator and run forever (until interrupted).

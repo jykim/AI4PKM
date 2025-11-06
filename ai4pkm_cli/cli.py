@@ -290,6 +290,129 @@ class PKMApp:
                 f"\n[red]✗ Test error after {execution_time:.2f}s: {e}[/red]"
             )
 
+    def trigger_orchestrator_agent(self):
+        """Trigger an orchestrator agent interactively."""
+        from .orchestrator_cli import OrchestratorCLI
+        from pathlib import Path
+
+        # Initialize orchestrator CLI
+        orch_cli = OrchestratorCLI()
+
+        try:
+            # Load orchestrator to get agents
+            from .config import Config
+            config_path = Path.cwd() / "ai4pkm_cli.json"
+            if not config_path.exists():
+                self.console.print(
+                    f"[red]✗ Error:[/red] ai4pkm_cli.json not found in current directory"
+                )
+                self.console.print(f"[yellow]Current directory:[/yellow] {Path.cwd()}")
+                self.console.print(
+                    f"\n[cyan]Must run from vault directory containing ai4pkm_cli.json[/cyan]"
+                )
+                return
+
+            config = Config(config_file=str(config_path))
+
+            # Create orchestrator (but don't start daemon)
+            from .orchestrator.core import Orchestrator
+            orch = Orchestrator(vault_path=Path.cwd(), config=config)
+
+            # Get all agents
+            agents_list = []
+            for abbr, agent in orch.agent_registry.agents.items():
+                agents_list.append(agent)
+
+            if not agents_list:
+                self.logger.error("No orchestrator agents found")
+                self.console.print(
+                    "[red]✗ No agents found in orchestrator configuration[/red]"
+                )
+                return
+
+            # Sort by abbreviation for consistent display
+            agents_list.sort(key=lambda a: a.abbreviation)
+
+            # Display available agents
+            self.console.print("\n[bold blue]Available Orchestrator Agents:[/bold blue]")
+            for i, agent in enumerate(agents_list, 1):
+                cron_info = f" [dim]cron: {agent.cron}[/dim]" if agent.cron else ""
+                input_info = (
+                    f" [dim]→ {agent.output_path}[/dim]" if agent.output_path else ""
+                )
+
+                self.console.print(
+                    f"[cyan]{i}.[/cyan] [bold]{agent.name} ({agent.abbreviation})[/bold]"
+                )
+                self.console.print(f"   Category: {agent.category}{cron_info}{input_info}\n")
+
+            # Get user selection
+            try:
+                choice = input(
+                    f"Enter agent number (1-{len(agents_list)}) or 'q' to quit: "
+                ).strip()
+
+                if choice.lower() == "q":
+                    self.logger.info("Trigger cancelled by user")
+                    return
+
+                agent_index = int(choice) - 1
+                if agent_index < 0 or agent_index >= len(agents_list):
+                    self.logger.error(
+                        f"Invalid choice: {choice}. Please enter a number between 1 and {len(agents_list)}"
+                    )
+                    return
+
+            except ValueError:
+                self.logger.error(f"Invalid input: {choice}. Please enter a number or 'q'")
+                return
+            except KeyboardInterrupt:
+                self.logger.info("\nTrigger cancelled by user")
+                return
+
+            # Trigger the selected agent
+            selected_agent = agents_list[agent_index]
+            self.logger.info(f"Triggering agent: {selected_agent.abbreviation}")
+            self.console.print(
+                f"\n[green]Triggering:[/green] {selected_agent.name} ({selected_agent.abbreviation})"
+            )
+
+            start_time = time.time()
+
+            try:
+                # Trigger agent once (synchronously)
+                ctx = orch.trigger_agent_once(selected_agent.abbreviation)
+
+                end_time = time.time()
+                execution_time = end_time - start_time
+
+                if ctx and ctx.success:
+                    self.logger.info(
+                        f"✓ Agent completed successfully ({execution_time:.1f}s)"
+                    )
+                    self.console.print(f"\n[green]✓ Agent completed successfully[/green]")
+                    self.console.print(
+                        f"[dim]Execution time: {execution_time:.2f}s[/dim]"
+                    )
+                    if ctx.output_file:
+                        self.console.print(f"[dim]Output: {ctx.output_file}[/dim]")
+                else:
+                    error_msg = ctx.error_message if ctx else "Unknown error"
+                    self.logger.error(f"✗ Agent failed: {error_msg}")
+                    self.console.print(f"\n[red]✗ Agent failed: {error_msg}[/red]")
+
+            except Exception as e:
+                end_time = time.time()
+                execution_time = end_time - start_time
+                self.logger.error(f"✗ Trigger error ({execution_time:.1f}s): {e}")
+                self.console.print(
+                    f"\n[red]✗ Trigger error after {execution_time:.2f}s: {e}[/red]"
+                )
+
+        except Exception as e:
+            self.logger.error(f"Error initializing orchestrator: {e}")
+            self.console.print(f"[red]✗ Error: {e}[/red]")
+
     def run_continuous(self):
         """Run continuously with cron job scheduler and web API server."""
         self.running = True
