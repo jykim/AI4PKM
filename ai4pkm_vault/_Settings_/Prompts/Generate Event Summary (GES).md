@@ -8,8 +8,13 @@ Summarize meeting/event content from voice transcriptions with calendar integrat
 ## Input
 - Meeting info from Google Calendar (via MCP)
 - Voice transcript from Ingest/Limitless/{{YYYY-MM-DD}}
+- Local time (from unix `date` command)
 - [[Meeting Template]] for structure reference
 - Event date and timing information
+
+## Parameters
+* Calendar name (Default: `Default`)
+* Time window (Default: past `24` hours)
 
 ## Output
 - File: AI/Events/{{YYYY-MM-DD}} Summary for {{Event}} - {{Agent-Name}}.md
@@ -34,14 +39,22 @@ Summarize meeting/event content from voice transcriptions with calendar integrat
 3. SUMMARY GENERATION
    - Use [[Meeting Template]] as starting point
    - Write in Korean unless original is English
+     - Fix all transcription / grammar errors / filler words
    - Match transcript with meeting start/end time
    - Add important quotes and main discussion points
-   - Optionally provide full transcript at end
+   - Add link from corresponding daily Journal doc
 ```
 
 ## Caveats
 ### Timing Accuracy
 ⚠️ **CRITICAL**: Match transcript with meeting start/end time
+
+### Duplication Check
+⚠️ **CRITICAL**: Always check for existing event summaries before creating new ones
+- Search pattern: `AI/Events/{{YYYY-MM-DD}} Summary for {{Event}}*.md`
+- Check for files from ANY agent (Claude Code, Claude, Gemini, Codex)
+- If exists: Update the existing file rather than creating a new one
+- Never create multiple summaries for the same event with different agent names
 
 ### Language Standards
 - **한글로 작성** (unless original transcript is in English)

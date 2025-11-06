@@ -1,0 +1,12 @@
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.inFolder("_Settings_/Prompts")
+        - '!file.inFolder("_Settings_/Prompts/_files_")'
+    order:
+      - file.name
+      - file.ctime
+      - category
+      - abbreviation

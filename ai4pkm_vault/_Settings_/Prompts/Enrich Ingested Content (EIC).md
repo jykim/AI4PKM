@@ -1,19 +1,22 @@
 ---
-title: Enrich Ingested Content (EIC)
-abbreviation: EIC
-category: ingestion
+title: "Enrich Ingested Content"
+abbreviation: "EIC"
+category: "workflow"
+created: "2024-01-01"
 ---
 Improve captured content through transcript correction, summarization, and knowledge linking.
 
 ## Input
-- Target note file
+- Target note file (typically in Ingest/Clippings/)
 - Long articles may need chunking to avoid partial processing
 - Original content with potential grammar/transcript errors
 
 ## Output
+- Updated note inline (don't create new note)
 - Status property set to `processed`
 - Summary section added at beginning
 - Improved formatting and structure
+- Links to existing KB topics
 
 ## Main Process
 ```
@@ -77,3 +80,8 @@ Improve captured content through transcript correction, summarization, and knowl
 - Limit highlights to essence (one per chapter)
 - Preserve original prose structure
 - Overall length should equal original
+
+### Topic Linking
+- Only link to existing topics in KB
+- Validate all topic links before adding
+- Add meaningful one-line summaries to topics

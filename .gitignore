@@ -1,14 +1,10 @@
-.obsidian/
-
 logs.txt
 *.log
 
-Journal/
-Reports/
-Ingest/
-AI/
-Topics/
-Photostream/
+ai4pkm_vault/Ingest/*
+ai4pkm_vault/Journal/*
+ai4pkm_vault/Topics/*
+ai4pkm_vault/AI/*
 
 # Photo processing artifacts
 *.DS_Store
@@ -20,6 +16,7 @@ __pycache__
 
 # IDE workspace files
 workspace.json
+graph.json
 
 # Environment variables
 .env

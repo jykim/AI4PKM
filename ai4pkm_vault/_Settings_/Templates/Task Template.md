@@ -1,14 +1,13 @@
 ---
 created:
 archived: false
-status:
-priority:
-task_type:
-source:
 worker:
+status: "TBD"
+priority:
 output:
 feedback:
 budget:
+task_type:
 ---
 ## Input
 
@@ -18,5 +17,3 @@ budget:
 %% e.g. Pre-defined Prompt %%
 
 ## Process Log
-
-## Evaluation Log

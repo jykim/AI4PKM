@@ -42,24 +42,11 @@ Summarize voice-based life logs into structured daily summaries with accurate li
 ```
 
 ## Caveats
-### Wiki Link Accuracy Requirements
-⚠️ **CRITICAL**: Use exact section header text from source file, character-for-character
-
-**Link Format**: `[[Limitless/{YYYY-MM-DD}#section]]`
-- BEFORE creating any link, verify the section header exists in the source file
-- Include all Korean characters, punctuation, and spacing exactly as written
-- Use the exact section header for the link, not a block ID
-- Don't omit 'Limitless/' prefix
-- If unsure about exact header text, link to file only: `[[Limitless/{YYYY-MM-DD}]]`
-
-### Link Examples
-**✅ CORRECT:**
-- Source: `## PKM 시스템 유지 관리의 어려움과 업무량 감소 방안 모색`
-- Link: `[[Limitless/2025-09-14#PKM 시스템 유지 관리의 어려움과 업무량 감소 방안 모색]]`
-
-**❌ INCORRECT:**
-- Wrong: `[[Limitless/2025-09-14#PKM 시스템 관리]]` (truncated)
-- Wrong: `[[Limitless/2025-09-14#AI 매니저 활용]]` (fabricated)
+### Wiki Link Requirements
+⚠️ **CRITICAL**: Follow `obsidian-links` skill for all wiki link creation:
+- Verify Limitless section headers exist before linking (exact Korean text)
+- Use format: `[[Limitless/YYYY-MM-DD#Exact Section Header]]`
+- When unsure about exact header, link to file only: `[[Limitless/YYYY-MM-DD]]`
 
 ### Content Standards
 - Add lessons/actions as todo items when needed

@@ -5,6 +5,7 @@ views:
       and:
         - file.path.startsWith("_Settings_/Tasks")
         - file.ext == "md"
+        - status != "IGNORE"
     order:
       - file.name
       - output
@@ -17,7 +18,7 @@ views:
       - property: created
         direction: DESC
     columnSize:
-      file.name: 386
-      note.output: 237
+      file.name: 372
+      note.output: 381
       note.created: 159
       note.status: 155

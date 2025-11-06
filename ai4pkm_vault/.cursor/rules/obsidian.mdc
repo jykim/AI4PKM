@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+This is my knowledge base repo. 
+
+# Overarching Rules
+- Do not making coding-related suggestions when not asked. 
+- Make changes to the file directly whenever possible (don't put writings in chat)
+  - IMPORTANT: Always use edit_file to modify documents directly, not chat responses
+- Keep the change minimum especially if you're updating paragraphs
+
+## Prompts & Workflows
+- Prompts can be found in `_Settings_/Prompts`
+- Workflows (of prompts) in `_Settings_/Workflows`
+- Each command can be called using abbreviations
+- Check this first for new command (especially if it's abbreviations)
+
+## Writing Specific
+- @`_Settings_/Workflows/Interactive Writing Assistant (IWA).md`
+
+## Further Instructions
+
+@AGENTS.md for further info

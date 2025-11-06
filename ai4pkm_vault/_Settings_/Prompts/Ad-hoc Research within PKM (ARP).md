@@ -1,7 +1,8 @@
 ---
-title: Ad-hoc Research within PKM (ARP)
-abbreviation: ARP
-category: research
+title: "Ad-hoc Research within PKM"
+abbreviation: "ARP"
+category: "research"
+created: "2024-01-01"
 ---
 
 Generate comprehensive research summaries from PKM content for deep dive analysis and content creation.

@@ -1,17 +1,21 @@
 ---
-title: Create Thread Postings (CTP)
-abbreviation: CTP
-category: publish
+title: "Create Thread Postings"
+abbreviation: "CTP"
+category: "creation"
+created: "2024-01-01"
 ---
-Generate social media thread candidates from personal content.
+
+Generate social media thread candidates from personal content within specified date ranges.
 
 ## Input
+- Date range for content selection
 - Life log content from AI/Lifelog (memorable conversations)
 - Readings & clippings (summaries and quotes)
 - Other content (projects and miscellaneous)
 - [[Social Media Template]] for structure
 
 ## Output
+- Files in AI/Sharable directory
 - Organized thread content (max 1k characters each)
 - Source links under each post
 - Up to 5 threads per output note
@@ -19,7 +23,9 @@ Generate social media thread candidates from personal content.
 ## Main Process
 ```
 1. CONTENT COLLECTION
+   - Extract memorable conversations from AI/Lifelog
    - Gather summaries and quotes from readings & clippings
+   - Include relevant project content and other materials
 
 2. THREAD ORGANIZATION
    - Use [[Social Media Template]] structure

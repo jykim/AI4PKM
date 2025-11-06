@@ -10,6 +10,7 @@ Generate comprehensive daily summaries integrating multiple sources with quote m
 - Target Date: YYYY-MM-DD (default: yesterday)
 - Journal/{{YYYY-MM-DD}} as starting point
 - Ingest/Clippings, Limitless, Lifelog files for date
+- AI/Events,Analysis,Articles
 - Apple Notes available for the date
 - [[Journal Template]] if file doesn't exist
 
@@ -33,8 +34,7 @@ Generate comprehensive daily summaries integrating multiple sources with quote m
    - Integrate Apple Notes with summaries
    - Extract insights from Life Logs (AI/Lifelog)
    - Review ALL available clippings for date
-   - Include book-related content
-   - Create "Additional Materials" if >10 clippings
+   - Dedup sources (processed sources have priority)
    - Generate source coverage report
 
 3. QUOTE MINING & TOPIC LINKING
@@ -53,17 +53,10 @@ Generate comprehensive daily summaries integrating multiple sources with quote m
 ### Source Coverage Requirements
 ⚠️ **CRITICAL**: Target 80%+ coverage of available sources
 
-### Quote Mining Standards
-- Format: > "Quote text" - Context/Speaker if applicable
-- Prioritize voice preservation over summary
-- Include quotes from multiple sources
-- Place strategically to support key insights
-
-### Topic Linking Validation
-- **CRITICAL**: Search existing Topics directory BEFORE creating links
-- Format: "[[Category/Page Title]]" (e.g., "[[Technology/AI Tools]]")
-- All topic links must point to existing files
-- Use established topics: PKM.md, AI Tools.md, Golf.md, Life Philosophy.md
+### Quote Mining & Topic Linking
+- Extract 3-5 memorable quotes (format per `obsidian-markdown-structure` skill)
+- Validate ALL topic links (use `obsidian-links` skill)
+- Link to established topics: PKM.md, AI Tools.md, Golf.md, Life Philosophy.md
 
 ### Journal Enhancement Rules
 - Be brief but comprehensive

@@ -58,15 +58,14 @@ Refer to that file for:
 
 ## Version Control
 ### Automatic Commit Policy
-
-**Knowledge Content Changes** (auto-commit allowed):
-- Regular workflow runs for knowledge tasks:
+- Commit changes after completing regular workflow runs 
+	- Don’t commit any other changes automatically
+- This includes changes from:
 	- DIR (Daily Ingestion and Roundup)
 	- CKU (Continuous Knowledge Upkeep)
 	- WRP (Weekly Roundup and Planning)
-	- Any batch content processing from prompts in `_Settings_/Prompts/`
-- Changes to knowledge files: `AI/`, `Ingest/`, `Topics/`, `Journal/`, etc.
-
+	- Any batch file modifications from prompts in `_Settings_/Prompts/`
+	- Processing that creates/modifies multiple files
 
 ### Commit Message Format for Workflows
 - Use format: `Workflow: [Name] - YYYY-MM-DD`

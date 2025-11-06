@@ -1,0 +1,30 @@
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.path.startsWith("AI/Tasks")
+        - file.ext == "md"
+        - status != "IGNORE"
+    order:
+      - created
+      - file.name
+      - output
+      - status
+      - worker
+      - reviewed
+      - task_type
+      - feedback
+      - source
+    sort:
+      - property: review_yn
+        direction: DESC
+      - property: created
+        direction: DESC
+    columnSize:
+      note.created: 233
+      file.name: 337
+      note.output: 168
+      note.status: 127
+      note.worker: 104
+      note.task_type: 84
