@@ -318,15 +318,26 @@ class PKMApp:
             from .orchestrator.core import Orchestrator
             orch = Orchestrator(vault_path=Path.cwd(), config=config)
 
-            # Get all agents
+            # Get agents that can be triggered manually
+            # Include: agents with cron schedules (can run on-demand)
+            # Exclude: pure file-based agents (no cron, need specific file events)
             agents_list = []
             for abbr, agent in orch.agent_registry.agents.items():
-                agents_list.append(agent)
+                # Show agents that have a cron schedule (scheduled agents)
+                # These can be triggered manually and will work without specific file input
+                if agent.cron:
+                    agents_list.append(agent)
+                # Also show agents with no input_path and no cron (manual agents)
+                elif not agent.input_path or (isinstance(agent.input_path, list) and not any(agent.input_path)):
+                    agents_list.append(agent)
 
             if not agents_list:
-                self.logger.error("No orchestrator agents found")
+                self.logger.error("No triggerable agents found")
                 self.console.print(
-                    "[red]✗ No agents found in orchestrator configuration[/red]"
+                    "[yellow]No agents available for manual trigger.[/yellow]"
+                )
+                self.console.print(
+                    "[dim]File-based agents (EIC, CTP) require file events to trigger.[/dim]"
                 )
                 return
 
