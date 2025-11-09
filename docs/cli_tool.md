@@ -18,6 +18,33 @@ pip install -e .
 
 After installation, the CLI will be available as the `ai4pkm` command.
 
+### Configuration Setup
+
+The CLI requires a configuration file named `ai4pkm_cli.json` in your vault directory.
+
+**Location:** The `ai4pkm_cli.json` file should be placed in your vault root directory (e.g., `ai4pkm_vault/ai4pkm_cli.json`). The CLI looks for this file in the current working directory when you run commands.
+
+**Initial Setup:**
+
+1. Copy the example configuration to your vault directory:
+   ```bash
+   cp ai4pkm_cli.json.example ai4pkm_vault/ai4pkm_cli.json
+   ```
+
+2. Edit the configuration to match your setup:
+   ```bash
+   cd ai4pkm_vault
+   # Edit ai4pkm_cli.json with your preferred editor
+   ```
+
+3. Run the CLI from your vault directory:
+   ```bash
+   cd ai4pkm_vault
+   ai4pkm
+   ```
+
+**Important:** Always run the `ai4pkm` command from your vault directory (where `ai4pkm_cli.json` is located). If the config file is not found, you'll see an error message asking you to run from the vault directory.
+
 ## Usage
 
 The CLI operates in several modes:
@@ -236,6 +263,70 @@ ai4pkm -a codex   # Codex
 The system automatically falls back to available agents if the selected one is not configured.
 
 ## Configuration
+
+### Main Configuration File (ai4pkm_cli.json)
+
+The primary configuration file `ai4pkm_cli.json` controls all CLI behavior and must be located in your vault directory.
+
+**File Location:** `<your-vault-directory>/ai4pkm_cli.json`
+
+Example: If your vault is at `ai4pkm_vault/`, the config file should be at `ai4pkm_vault/ai4pkm_cli.json`
+
+**Full Configuration Example:**
+```json
+{
+  "default-agent": "claude_code",
+  "agents-config": {
+    "claude_code": {
+      "permission_mode": "bypassPermissions"
+    },
+    "gemini_cli": {
+      "command": "gemini"
+    },
+    "codex_cli": {
+      "command": "codex"
+    }
+  },
+  "photo_processing": {
+    "source_folder": "Ingest/Photolog/Original/",
+    "destination_folder": "Ingest/Photolog/Processed/",
+    "albums": ["AI4PKM"],
+    "days": 7
+  },
+  "web_api": {
+    "port": 8000
+  },
+  "task_management": {
+    "max_concurrent": 5,
+    "processing_agent": {
+      "EIC": "claude_code",
+      "default": "claude_code"
+    },
+    "evaluation_agent": "claude_code",
+    "timeout_minutes": 30
+  },
+  "orchestrator": {
+    "prompts_dir": "_Settings_/Prompts",
+    "tasks_dir": "_Settings_/Tasks",
+    "logs_dir": "_Settings_/Logs",
+    "max_concurrent": 3
+  },
+  "cron_jobs": []
+}
+```
+
+**Configuration Sections:**
+- `default-agent`: Which AI agent to use by default (claude_code, gemini_cli, codex_cli)
+- `agents-config`: Agent-specific settings
+- `photo_processing`: Photo sync and processing settings
+- `web_api`: Web API server configuration
+- `task_management`: Task processing and routing configuration
+- `orchestrator`: Orchestrator mode settings
+- `cron_jobs`: Scheduled automation jobs
+
+**Note:** An example configuration file is provided as `ai4pkm_cli.json.example` in the repository root. Copy this to your vault directory and customize as needed.
+
+---
 
 ### Orchestrator Configuration (orchestrator.yaml)
 

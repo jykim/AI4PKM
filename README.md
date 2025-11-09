@@ -35,7 +35,31 @@ This vault is optimized for AI integration with:
 - Cursor IDE rules in `.cursor/rules/`
 
 ## AI4PKM CLI
-For automated execution, use [[README_CLI|CLI Tool]] provided as python package.
+
+For automated execution, use the CLI Tool provided as a python package.
+
+### Quick Start
+
+1. **Install the CLI:**
+   ```bash
+   pip install -e .
+   ```
+
+2. **Configure the vault:**
+   The CLI requires `ai4pkm_cli.json` configuration file in your vault directory.
+   
+   ```bash
+   # Copy example config to your vault
+   cp ai4pkm_cli.json.example ai4pkm_vault/ai4pkm_cli.json
+   ```
+
+3. **Run from vault directory:**
+   ```bash
+   cd ai4pkm_vault
+   ai4pkm
+   ```
+
+For detailed documentation, see [CLI Tool Guide](docs/cli_tool.md).
 
 ## Community Plugins
 The following plugins are recommended and pre-configured:
