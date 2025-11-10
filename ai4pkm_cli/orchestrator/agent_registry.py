@@ -442,9 +442,10 @@ class AgentRegistry:
             if not self._check_content_pattern(event_path, agent.trigger_content_pattern):
                 return False
 
-            # Check for existing task to avoid duplication
-            if self._has_existing_task(event_path):
-                logger.debug(f"Skipping {event_path} - task already exists")
+        # Check for existing task to avoid duplication (for all file-based triggers)
+        if agent.trigger_event in ('created', 'modified') and event_path:
+            if self._has_existing_task(event_path, agent):
+                logger.warning(f"Skipping {event_path} - duplicate task already exists for agent {agent.abbreviation}")
                 return False
 
         return True
@@ -475,15 +476,21 @@ class AgentRegistry:
             logger.error(f"Error reading file {event_path}: {e}")
             return False
 
-    def _has_existing_task(self, event_path: str) -> bool:
+    def _has_existing_task(self, event_path: str, agent: AgentDefinition) -> bool:
         """
-        Check if a task already exists for this file in tasks directory.
-
+        Check if a task already exists for this file and agent.
+        
+        Uses frontmatter-based matching for accuracy:
+        1. Checks task file frontmatter for task_type match
+        2. Extracts input path from task body (Target file: `[[path]]`)
+        3. Compares exact paths or same filename for same agent
+        
         Args:
             event_path: Relative file path from event
-
+            agent: Agent definition to check against
+            
         Returns:
-            True if task file already exists
+            True if task file already exists for this file/agent combination
         """
         try:
             # Get tasks directory from config
@@ -491,22 +498,102 @@ class AgentRegistry:
             tasks_dir = self.vault_path / tasks_dir_path
             if not tasks_dir.exists():
                 return False
-
-            # Extract filename without extension
-            source_filename = Path(event_path).stem
-
-            # Search for task files containing the source filename
-            # Format: YYYY-MM-DD {agent} - {source_filename}.md
+            
+            # Normalize event path for comparison
+            event_path_normalized = str(Path(event_path))
+            event_filename = Path(event_path).stem
+            event_filename_normalized = self._normalize_filename(event_filename)
+            
+            # Search task files
             for task_file in tasks_dir.glob("*.md"):
-                if source_filename in task_file.stem:
-                    logger.debug(f"Found existing task: {task_file.name}")
-                    return True
-
+                try:
+                    # Read frontmatter
+                    fm = read_frontmatter(task_file)
+                    task_agent_abbr = fm.get('task_type')
+                    
+                    # Must match same agent
+                    if task_agent_abbr != agent.abbreviation:
+                        continue
+                    
+                    # Extract input path from task body
+                    task_content = task_file.read_text(encoding='utf-8')
+                    input_path = self._extract_input_path_from_task(task_content)
+                    
+                    if input_path:
+                        # Normalize for comparison
+                        input_path_normalized = str(Path(input_path))
+                        input_filename = Path(input_path).stem
+                        input_filename_normalized = self._normalize_filename(input_filename)
+                        
+                        # Exact path match
+                        if input_path_normalized == event_path_normalized:
+                            logger.debug(f"Found duplicate task: {task_file.name} (exact path match)")
+                            return True
+                        
+                        # Normalized filename match (handles variations like " Readwise" suffix)
+                        if input_filename_normalized == event_filename_normalized:
+                            logger.debug(f"Found duplicate task: {task_file.name} (normalized filename match: {input_filename_normalized})")
+                            return True
+                            
+                except Exception as e:
+                    # Skip malformed task files, log warning
+                    logger.debug(f"Error reading task file {task_file.name}: {e}")
+                    continue
+            
             return False
-
+            
         except Exception as e:
             logger.error(f"Error checking for existing task: {e}")
             return False
+
+    def _extract_input_path_from_task(self, task_content: str) -> Optional[str]:
+        """
+        Extract input file path from task file content.
+        
+        Looks for pattern: Target file: `[[path]]`
+        
+        Args:
+            task_content: Full task file content
+            
+        Returns:
+            Extracted path or None if not found
+        """
+        # Pattern: Target file: `[[path]]`
+        pattern = r'Target file:\s*`\[\[([^\]]+)\]\]`'
+        match = re.search(pattern, task_content)
+        
+        if match:
+            return match.group(1)
+        
+        return None
+
+    def _normalize_filename(self, filename: str) -> str:
+        """
+        Normalize filename for comparison by removing common variations.
+        
+        Removes:
+        - " Readwise" suffix (common in Readwise imports)
+        - Extra whitespace
+        - Normalizes to lowercase for comparison
+        
+        Args:
+            filename: Original filename
+            
+        Returns:
+            Normalized filename
+        """
+        # Remove common suffixes
+        normalized = filename
+        suffixes_to_remove = [" Readwise", " readwise", " Readwise Reader", " readwise reader"]
+        for suffix in suffixes_to_remove:
+            if normalized.endswith(suffix):
+                normalized = normalized[:-len(suffix)]
+                break
+        
+        # Remove trailing whitespace
+        normalized = normalized.rstrip()
+        
+        return normalized
 
     def export_config_snapshot(self, output_path: Path):
         """
