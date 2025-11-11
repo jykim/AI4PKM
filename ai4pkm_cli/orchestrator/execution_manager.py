@@ -8,6 +8,8 @@ import threading
 import subprocess
 import time
 import os
+import shutil
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -395,6 +397,20 @@ class ExecutionManager:
         self._execute_subprocess(ctx, 'Grok CLI', ['grok', '--prompt', ctx.prompt], agent.timeout_minutes * 60)
 
     def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int):
+        # Windows compatibility: resolve executable path
+        if cmd and sys.platform == 'win32':
+            executable = shutil.which(cmd[0])
+            if executable is None:
+                # Try with .exe extension on Windows
+                executable = shutil.which(cmd[0] + '.exe')
+            if executable is None:
+                raise FileNotFoundError(
+                    f"Could not find '{cmd[0]}' executable. "
+                    f"Please ensure it is installed and available in your PATH. "
+                    f"On Windows, you may need to use the full path or add it to your PATH environment variable."
+                )
+            cmd = [executable] + cmd[1:]
+        
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.DEVNULL,
