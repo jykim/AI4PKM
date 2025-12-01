@@ -181,29 +181,73 @@ class BasePoller(ABC):
     def _polling_loop(self) -> None:
         """Main polling loop that runs in background thread."""
         self.logger.info(f"{self.__class__.__name__} polling loop started")
-        
+
         first_run = True
-        
-        while self._running:
-            try:
-                if first_run:
-                    self.logger.info(f"{self.__class__.__name__} running initial poll immediately")
-                    first_run = False
-                self.run_once()
-                
-                if self._shutdown_event.wait(timeout=self.poll_interval):
-                    break
-                    
-            except Exception as e:
-                self.logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", exc_info=True)
-                if self._shutdown_event.wait(timeout=60):
-                    break
-        
-        self.logger.info(f"{self.__class__.__name__} polling loop stopped")
+
+        try:
+            while self._running:
+                try:
+                    if first_run:
+                        self.logger.info(f"{self.__class__.__name__} running initial poll immediately")
+                        first_run = False
+                    self.run_once()
+
+                    if self._shutdown_event.wait(timeout=self.poll_interval):
+                        break
+
+                except Exception as e:
+                    self.logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", exc_info=True)
+                    if self._shutdown_event.wait(timeout=60):
+                        break
+        except (KeyboardInterrupt, SystemExit):
+            self.logger.info(f"{self.__class__.__name__} received shutdown signal")
+        except BaseException as e:
+            # Catch any other fatal exceptions (C-level crashes, etc.)
+            self.logger.critical(f"{self.__class__.__name__} polling loop crashed with fatal error: {e}", exc_info=True)
+        finally:
+            self._running = False
+            self.logger.info(f"{self.__class__.__name__} polling loop stopped")
 
     def is_running(self) -> bool:
         """Check if poller is currently running."""
         return self._running
+
+    def is_thread_alive(self) -> bool:
+        """
+        Check if the polling thread is actually alive.
+
+        This is more reliable than is_running() for detecting silently crashed threads.
+        A thread can be marked as _running=True but actually be dead.
+
+        Returns:
+            True if thread exists and is alive, False otherwise
+        """
+        return self._thread is not None and self._thread.is_alive()
+
+    def is_healthy(self) -> bool:
+        """
+        Check if the poller is healthy (running and thread alive).
+
+        Returns:
+            True if poller should be running and thread is alive, False otherwise
+        """
+        # If not meant to be running, it's "healthy" in the sense that it's working as expected
+        if not self._running:
+            return True
+        # If meant to be running, thread must be alive
+        return self.is_thread_alive()
+
+    def restart(self) -> None:
+        """
+        Restart the poller.
+
+        Stops the poller if running and starts it again.
+        Used by watchdog to recover from dead threads.
+        """
+        self.logger.info(f"Restarting {self.__class__.__name__}...")
+        self.stop()
+        self.start()
+        self.logger.info(f"{self.__class__.__name__} restarted successfully")
 
     def get_state(self) -> Dict[str, Any]:
         """Get current state dictionary."""
