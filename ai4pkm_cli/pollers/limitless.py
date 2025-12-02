@@ -145,17 +145,26 @@ class LimitlessPoller(BasePoller):
         return filtered_lifelogs
 
     def format_lifelogs_markdown(self, lifelogs, timezone_str):
-        """Convert lifelog data to markdown format."""
+        """Convert lifelog data to markdown format with YAML frontmatter."""
         if not lifelogs:
-            return "# Limitless Data\n\nNo lifelog data available for this date.\n"
-        
+            return "---\ntotal_conversations: 0\nstarred_conversations: 0\nstarred_list: []\n---\n\n# Limitless Data\n\nNo lifelog data available for this date.\n"
+
         local_tz = pytz.timezone(timezone_str)
         markdown_content = ""
+
+        # Track statistics
+        total_conversations = len(lifelogs)
+        starred_conversations = 0
+        starred_list = []
 
         for entry in sorted(lifelogs, key=lambda x: x.get('startTime', '')):
             contents = entry.get('contents', [])
             if not contents:
                 continue
+
+            is_starred = entry.get('isStarred', False)
+            if is_starred:
+                starred_conversations += 1
 
             for item in contents:
                 item_type = item.get('type')
@@ -167,7 +176,12 @@ class LimitlessPoller(BasePoller):
                     continue
 
                 if item_type == 'heading1':
-                    markdown_content += f"# {content}\n"
+                    if is_starred:
+                        heading = f"# ⭐ {content}"
+                        starred_list.append(f"[[#⭐ {content}]]")
+                    else:
+                        heading = f"# {content}"
+                    markdown_content += f"{heading}\n"
                 elif item_type == 'heading2':
                     markdown_content += f"## {content}\n"
                 elif item_type == 'blockquote':
@@ -179,10 +193,22 @@ class LimitlessPoller(BasePoller):
                             time_display = local_dt.strftime("%-m/%-d/%y %-I:%M %p")
                         except (ValueError, TypeError):
                             pass
-                    
+
                     markdown_content += f"- {speaker} ({time_display}): {content}\n"
-        
-        return markdown_content.strip()
+
+        # Build YAML frontmatter
+        frontmatter = "---\n"
+        frontmatter += f"total_conversations: {total_conversations}\n"
+        frontmatter += f"starred_conversations: {starred_conversations}\n"
+        if starred_list:
+            frontmatter += "starred_list:\n"
+            for item in starred_list:
+                frontmatter += f"  - \"{item}\"\n"
+        else:
+            frontmatter += "starred_list: []\n"
+        frontmatter += "---\n\n"
+
+        return frontmatter + markdown_content.strip()
 
     def sync_date(self, date_str, timezone):
         """Sync data for a specific date."""
