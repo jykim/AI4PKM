@@ -45,20 +45,20 @@ class GobiPoller(BasePoller):
             True if successful, False otherwise
         """
         if not self.api_key:
-            self.logger.warning(
+            logger.warning(
                 "api_key not found in secrets.yaml for gobi poller. Skipping sync."
             )
             return False
 
-        self.logger.info("Starting Gobi data sync...")
+        logger.info("Starting Gobi data sync...")
         try:
             local_timezone_setting = self.poller_config.get("local_timezone")
             if local_timezone_setting:
                 timezone_name = local_timezone_setting
-                self.logger.info(f"Using configured timezone: {timezone_name}")
+                logger.info(f"Using configured timezone: {timezone_name}")
             else:
                 timezone_name = str(get_localzone())
-                self.logger.info(f"Using system local timezone: {timezone_name}")
+                logger.info(f"Using system local timezone: {timezone_name}")
             
             transcriptions, frames = self.fetch_all_data(timezone_name)
 
@@ -67,16 +67,16 @@ class GobiPoller(BasePoller):
             for target_date, markdown in markdowns.items():
                 self.save_to_file(markdown, target_date)
 
-            self.logger.info("Gobi data sync finished successfully.")
+            logger.info("Gobi data sync finished successfully.")
             
             return True
         except Exception as e:
-            self.logger.error(f"An error occurred during Gobi sync: {e}", exc_info=True)
+            logger.error(f"An error occurred during Gobi sync: {e}", exc_info=True)
             return False
 
     def fetch_all_data(self, timezone_name: str):
         """Fetch all data from Gobi API."""
-        self.logger.info("Fetching recent data...")
+        logger.info("Fetching recent data...")
 
         last_sync_time = None
         if "last_sync_time" in self.state:
@@ -133,12 +133,12 @@ class GobiPoller(BasePoller):
                 self.update_state(last_sync_time=lastSyncTime)
 
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {e}")
+            logger.error(f"API request failed: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                self.logger.error(f"Response: {e.response.text}")
+                logger.error(f"Response: {e.response.text}")
             return [], []
 
-        self.logger.info(
+        logger.info(
             f"Retrieved {len(transcriptions)} transcriptions and {len(frames)} frames."
         )
         
@@ -164,7 +164,7 @@ class GobiPoller(BasePoller):
                     download_tasks.append(download_task)
 
         if download_tasks:
-            self.logger.info(
+            logger.info(
                 f"Starting parallel download of {len(download_tasks)} frames..."
             )
             with ThreadPoolExecutor(max_workers=5) as executor:
@@ -181,11 +181,11 @@ class GobiPoller(BasePoller):
                     try:
                         success = future.result()
                         if not success:
-                            self.logger.warning(
+                            logger.warning(
                                 f"Failed to download frame: {file_path}"
                             )
                     except Exception as e:
-                        self.logger.error(
+                        logger.error(
                             f"Exception during frame download {file_path}: {e}"
                         )
 
@@ -234,14 +234,14 @@ class GobiPoller(BasePoller):
         """Download a single frame image."""
         try:
             if not file_path.exists():
-                self.logger.info(f"Downloading frame to {file_path}...")
+                logger.info(f"Downloading frame to {file_path}...")
                 response = requests.get(download_url)
                 response.raise_for_status()
                 with open(file_path, "wb") as f:
                     f.write(response.content)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to download frame {file_path}: {e}")
+            logger.error(f"Failed to download frame {file_path}: {e}")
             return False
 
     def save_to_file(self, content, target_date):
@@ -249,10 +249,10 @@ class GobiPoller(BasePoller):
         filepath = self.output_dir / f"{target_date}.md"
         try:
             filepath.write_text(content, encoding="utf-8")
-            self.logger.info(f"Saved to: {filepath}")
+            logger.info(f"Saved to: {filepath}")
             return filepath
         except Exception as e:
-            self.logger.error(f"Failed to save file: {e}")
+            logger.error(f"Failed to save file: {e}")
             return None
 
 

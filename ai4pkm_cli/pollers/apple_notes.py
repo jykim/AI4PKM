@@ -14,7 +14,6 @@ from ..logger import Logger
 
 logger = Logger()
 
-
 class AppleNotesPoller(BasePoller):
     """Poller for processing Apple Notes with configurable destination folders."""
 
@@ -42,8 +41,8 @@ class AppleNotesPoller(BasePoller):
         Returns:
             True if successful, False otherwise
         """
-        self.logger.info(f"Processing notes to: {self.destination_folder}")
-        self.logger.info(f"Looking back {self.days} days")
+        logger.info(f"Processing notes to: {self.destination_folder}")
+        logger.info(f"Looking back {self.days} days")
         
         existing_note_ids = set()
         if os.path.exists(self.destination_folder):
@@ -63,12 +62,12 @@ class AppleNotesPoller(BasePoller):
                     except Exception:
                         continue
         
-        self.logger.info(f"Found {len(existing_note_ids)} existing processed notes")
+        logger.info(f"Found {len(existing_note_ids)} existing processed notes")
 
         temp_folder = os.path.join(self.destination_folder, "_temp_export")
         
         try:
-            self.logger.info("Exporting notes from Apple Notes app...")
+            logger.info("Exporting notes from Apple Notes app...")
             
             script_path = os.path.join(
                 os.path.dirname(__file__), "..", "scripts", "export_notes.applescript"
@@ -76,7 +75,7 @@ class AppleNotesPoller(BasePoller):
             script_path = os.path.abspath(script_path)
             
             if not os.path.exists(script_path):
-                self.logger.error(f"AppleScript not found: {script_path}")
+                logger.error(f"AppleScript not found: {script_path}")
                 return False
 
             result = subprocess.run(
@@ -89,22 +88,22 @@ class AppleNotesPoller(BasePoller):
                     line = line.strip()
                     if line:
                         if any(keyword in line for keyword in ["Exported:", "Export completed:", "Total notes"]):
-                            self.logger.info(f"AppleScript: {line}")
+                            logger.info(f"AppleScript: {line}")
                         else:
-                            self.logger.debug(f"AppleScript: {line}")
+                            logger.debug(f"AppleScript: {line}")
                             
-            self.logger.info("Notes export completed successfully")
+            logger.info("Notes export completed successfully")
             
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"AppleScript execution failed: {e}")
-            self.logger.error(f"Error output: {e.stderr}")
+            logger.error(f"AppleScript execution failed: {e}")
+            logger.error(f"Error output: {e.stderr}")
             return False
         except Exception as e:
-            self.logger.error(f"Error exporting/caching notes: {e}")
+            logger.error(f"Error exporting/caching notes: {e}")
             return False
 
         try:
-            self.logger.info("Processing exported notes...")
+            logger.info("Processing exported notes...")
             
             os.makedirs(self.destination_folder, exist_ok=True)
             
@@ -114,8 +113,8 @@ class AppleNotesPoller(BasePoller):
             json_pattern = os.path.join(temp_folder, "*.json")
             json_files = glob.glob(json_pattern)
             
-            self.logger.debug(f"Looking for JSON files with pattern: {json_pattern}")
-            self.logger.info(f"Found {len(json_files)} exported notes to process")
+            logger.debug(f"Looking for JSON files with pattern: {json_pattern}")
+            logger.info(f"Found {len(json_files)} exported notes to process")
             
             processed_count = 0
             skipped_count = 0
@@ -129,39 +128,39 @@ class AppleNotesPoller(BasePoller):
                     html_file = os.path.join(temp_folder, base_name + ".html")
                     
                     if not os.path.exists(html_file):
-                        self.logger.warning(f"HTML file not found for: {base_name}")
+                        logger.warning(f"HTML file not found for: {base_name}")
                         continue
                     
                     note_id = metadata.get('id')
                     if note_id and note_id in existing_note_ids:
                         skipped_count += 1
-                        self.logger.debug(f"Already processed: {metadata.get('title', 'Untitled')} (id: {note_id})")
+                        logger.debug(f"Already processed: {metadata.get('title', 'Untitled')} (id: {note_id})")
                         continue
                     
                     self._process_single_note(metadata, html_file, self.destination_folder, files_folder)
                     processed_count += 1
                     
                     final_filename = base_name + ".md"
-                    self.logger.info(f"Processed: {final_filename}")
+                    logger.info(f"Processed: {final_filename}")
                     
                 except Exception as e:
-                    self.logger.error(f"Error processing {json_file}: {e}")
+                    logger.error(f"Error processing {json_file}: {e}")
                     continue
             
-            self.logger.info(f"Notes processing completed: {processed_count} processed, {skipped_count} skipped")
+            logger.info(f"Notes processing completed: {processed_count} processed, {skipped_count} skipped")
             
             return True
             
         except Exception as e:
-            self.logger.error(f"Error processing notes: {e}")
+            logger.error(f"Error processing notes: {e}")
             return False
         finally:
             try:
                 if os.path.exists(temp_folder):
                     shutil.rmtree(temp_folder)
-                    self.logger.debug("Cleaned up temporary export folder")
+                    logger.debug("Cleaned up temporary export folder")
             except Exception as e:
-                self.logger.warning(f"Could not clean up temp folder: {e}")
+                logger.warning(f"Could not clean up temp folder: {e}")
 
     def _sanitize_title(self, title: str) -> str:
         """Sanitize title to match the format used in filenames."""
@@ -218,7 +217,7 @@ class AppleNotesPoller(BasePoller):
             converter.unicode_snob = True
             return converter.handle(html_content).strip()
         except ImportError:
-            self.logger.debug("html2text not available, using basic conversion")
+            logger.debug("html2text not available, using basic conversion")
             return self._basic_html_to_markdown(html_content)
 
     def _basic_html_to_markdown(self, html_content: str) -> str:
@@ -269,13 +268,13 @@ class AppleNotesPoller(BasePoller):
                 extracted_images.append(f"![[{filename}]]")
                 return ""
             except Exception as e:
-                self.logger.warning(f"Could not extract image: {e}")
+                logger.warning(f"Could not extract image: {e}")
                 return ""
         
         processed_content = re.sub(data_url_pattern, extract_data_url, html_content)
         
         if image_count > 0:
-            self.logger.info(f"Extracted {image_count} images from HTML to _files_/")
+            logger.info(f"Extracted {image_count} images from HTML to _files_/")
             self._extracted_images = extracted_images
         else:
             self._extracted_images = []
