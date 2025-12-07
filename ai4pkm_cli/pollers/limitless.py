@@ -36,7 +36,13 @@ class LimitlessPoller(BasePoller):
         
         if not self.api_key:
             self.is_ready = False
-            logger.warning("api_key not found in secrets.yaml for limitless poller. Poller will skip.")
+            logger.error(
+                "Limitless poller disabled: api_key not found.\n"
+                "  Add to secrets.yaml:\n"
+                "    pollers:\n"
+                "      limitless:\n"
+                "        api_key: \"your-api-key-here\""
+            )
             return
         
         self.is_ready = True
