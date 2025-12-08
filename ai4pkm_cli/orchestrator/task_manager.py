@@ -347,6 +347,16 @@ class TaskFileManager:
         
         title = f"{agent.abbreviation} - {Path(input_file_path).stem}"
         
+        # Extract base task type and worker label from abbreviation
+        # Worker agents have abbreviation like "EIC-Claude", base agents have "EIC"
+        if '-' in agent.abbreviation:
+            parts = agent.abbreviation.split('-', 1)
+            base_task_type = parts[0]
+            worker_label = parts[1]
+        else:
+            base_task_type = agent.abbreviation
+            worker_label = ""
+
         frontmatter_data = {
             'title': title,
             'created': created_time,
@@ -355,9 +365,13 @@ class TaskFileManager:
             'status': initial_status,
             'priority': agent.task_priority,
             'output': "",
-            'task_type': agent.abbreviation,
+            'task_type': base_task_type,  # Base agent abbreviation (e.g., "EIC")
             'generation_log': log_link
         }
+
+        # Add worker_label for multi-worker tasks
+        if worker_label:
+            frontmatter_data['worker_label'] = worker_label
         
         # Add agent_params if available
         if agent.agent_params:

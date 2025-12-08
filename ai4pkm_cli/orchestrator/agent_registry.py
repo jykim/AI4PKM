@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 import fnmatch
 from croniter import croniter
 
-from .models import AgentDefinition
+from .models import AgentDefinition, WorkerConfig
 from ..markdown_utils import read_frontmatter, extract_body
 from ..logger import Logger
 
@@ -283,6 +283,19 @@ class AgentRegistry:
         # Get agent_params from node (explicit YAML property)
         agent_params = node.get('agent_params', {})
 
+        # Parse workers list for multi-worker execution
+        workers_config = node.get('workers', [])
+        workers = []
+        for w in workers_config:
+            if isinstance(w, dict) and 'executor' in w and 'label' in w:
+                workers.append(WorkerConfig(
+                    executor=w['executor'],
+                    label=w['label'],
+                    agent_params=w.get('agent_params', {})
+                ))
+            else:
+                logger.warning(f"Invalid worker config in {frontmatter['abbreviation']}: {w}")
+
         agent = AgentDefinition(
             name=frontmatter['title'],
             abbreviation=frontmatter['abbreviation'],
@@ -314,7 +327,8 @@ class AgentRegistry:
             task_archived=task_archived,
             file_path=file_path,
             version=node.get('version', '1.0'),
-            agent_params=agent_params
+            agent_params=agent_params,
+            workers=workers
         )
 
         return agent
