@@ -609,6 +609,12 @@ class ExecutionManager:
         prompt += "\n\n# Trigger Context\n"
         prompt += f"- Event: {trigger_data.get('event_type', 'unknown')}\n"
         prompt += f"- Input Path: {trigger_data.get('path', 'unknown')}\n"
+
+        # Add worker context for multi-worker agents
+        if '-' in agent.abbreviation:
+            parts = agent.abbreviation.split('-', 1)
+            worker_label = parts[1]
+            prompt += f"- Worker: {worker_label} (multi-worker evaluation mode)\n"
         
         # Add task file path if available
         if ctx and ctx.task_file:
