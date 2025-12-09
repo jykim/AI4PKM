@@ -126,8 +126,6 @@ class BasePoller(ABC):
         Returns:
             True if successful, False otherwise
         """
-        logger.info(f"Running {self.__class__.__name__} once...")
-        
         try:
             logger.info(f"Running {self.__class__.__name__}", console=True)
 
@@ -142,7 +140,7 @@ class BasePoller(ABC):
             return success
             
         except Exception as e:
-            logger.error(f"{self.__class__.__name__} failed: {e}", exc_info=True)
+            logger.error(f"{self.__class__.__name__} failed: {e}", console=True, exc_info=True)
             self.save_state()
             return False
 
@@ -186,16 +184,17 @@ class BasePoller(ABC):
         while self._running:
             try:
                 if first_run:
-                    logger.info(f"{self.__class__.__name__} running initial poll immediately")
+                    logger.info(f"{self.__class__.__name__} running initial poll immediately", console=True)
                     first_run = False
                 self.run_once()
                 
                 if not self._running:
+                    logger.error(f"{self.__class__.__name__} polling loop stopped", console=True)
                     break
                 time.sleep(self.poll_interval)
                     
             except Exception as e:
-                logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", exc_info=True)
+                logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", console=True, exc_info=True)
                 if not self._running:
                     break
                 time.sleep(60)
