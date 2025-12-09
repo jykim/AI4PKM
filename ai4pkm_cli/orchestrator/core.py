@@ -948,6 +948,7 @@ class Orchestrator:
             abbreviation=worker_abbr,
             executor=worker.executor,
             agent_params=merged_params,
+            output_path=worker.output_path or base_agent.output_path,
             output_naming=output_naming,
             log_pattern='{timestamp}-{agent}.log',  # Agent abbr includes worker label
             workers=[]  # Clear workers list to prevent recursion

@@ -14,7 +14,7 @@ class WorkerConfig:
     executor: str  # claude_code, gemini_cli, etc.
     label: str     # Human-readable label (e.g., "Claude", "Gemini")
     agent_params: Dict[str, Any] = field(default_factory=dict)
-    # Future: evaluation_prompt, scoring_criteria, etc.
+    output_path: Optional[str] = None  # Worker-specific output directory
 
 
 @dataclass
