@@ -348,11 +348,13 @@ class TaskFileManager:
         title = f"{agent.abbreviation} - {Path(input_file_path).stem}"
         
         # Extract base task type and worker label from abbreviation
-        # Worker agents have abbreviation like "EIC-Claude", base agents have "EIC"
+        # Worker agents have abbreviation like "SPT-Gemini" or "SPE-GeminiResults-Codex"
+        # For multi-level agents (e.g., SPE-GeminiResults-Codex), we need to split from the RIGHT
+        # to correctly extract: base_task_type="SPE-GeminiResults", worker_label="Codex"
         if '-' in agent.abbreviation:
-            parts = agent.abbreviation.split('-', 1)
-            base_task_type = parts[0]
-            worker_label = parts[1]
+            parts = agent.abbreviation.rsplit('-', 1)  # Split from right
+            base_task_type = parts[0]  # Parent agent ID (e.g., "SPE-GeminiResults")
+            worker_label = parts[1]    # Worker label only (e.g., "Codex")
         else:
             base_task_type = agent.abbreviation
             worker_label = ""
