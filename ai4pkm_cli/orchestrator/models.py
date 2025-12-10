@@ -66,6 +66,8 @@ class AgentDefinition:
 class ExecutionContext:
     """Context for a single agent execution."""
     execution_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: Optional[str] = None  # Optional session ID for tracking related executions
+    resume_session: bool = False  # If True, resume existing session; if False, create new session
     agent: Optional[AgentDefinition] = None
     trigger_data: Dict[str, Any] = field(default_factory=dict)
 

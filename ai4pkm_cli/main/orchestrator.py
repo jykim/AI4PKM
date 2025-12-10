@@ -134,3 +134,63 @@ def show_orchestrator_status(vault_path: Path = None, working_dir: str = None):
                 f"    Interval: {poller.poll_interval}s"
             )
 
+
+def execute_prompt_with_session(
+    prompt: str,
+    session_id: str = None,
+    vault_path: Path = None,
+    working_dir: str = None
+):
+    """
+    Execute a one-time prompt with Claude agent and optional session ID.
+    Automatically resumes session if it exists, creates new if it doesn't.
+
+    Args:
+        prompt: The prompt text to execute
+        session_id: Optional session ID for tracking related executions (auto resume/create)
+        vault_path: Path to vault root (defaults to CWD)
+        working_dir: Working directory for agent subprocess execution (defaults to vault_path)
+    """
+    from ..config import Config
+    import time
+    
+    config = Config()
+    vault_path = vault_path or Path.cwd()
+    
+    logger.info(Panel.fit(
+        f"[bold cyan]Executing One-Time Prompt[/bold cyan]\n"
+        f"Session ID: {session_id or '(none)'}\n"
+        f"Mode: auto (resume if exists, create if not)",
+        title="Prompt Execution"
+    ))
+    
+    # Create orchestrator
+    orch = Orchestrator(
+        vault_path=vault_path,
+        config=config,
+        working_dir=Path(working_dir) if working_dir else None
+    )
+    
+    # Execute prompt
+    start_time = time.time()
+    ctx = orch.execute_prompt_with_session(
+        prompt=prompt,
+        session_id=session_id
+    )
+    end_time = time.time()
+    execution_time = end_time - start_time
+    
+    if ctx and ctx.success:
+        logger.info(f"\n[green]✓ Prompt executed successfully ({execution_time:.1f}s)[/green]")
+        if ctx.session_id:
+            logger.info(f"[dim]Session ID: {ctx.session_id}[/dim]")
+        # Display the response
+        if ctx.response:
+            logger.info(f"\n[bold cyan]Response:[/bold cyan]")
+            logger.info(ctx.response)
+    else:
+        error_msg = ctx.error_message if ctx else "Unknown error"
+        logger.error(f"\n[red]✗ Prompt execution failed: {error_msg}[/red]")
+    
+    return ctx
+

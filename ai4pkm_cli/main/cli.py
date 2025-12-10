@@ -10,7 +10,7 @@ from pathlib import Path
 from .trigger_agent import trigger_orchestrator_agent
 from .list_agents import list_agents as list_agents_handler
 from .show_config import show_config as show_config_handler
-from .orchestrator import run_orchestrator_daemon, show_orchestrator_status
+from .orchestrator import run_orchestrator_daemon, show_orchestrator_status, execute_prompt_with_session
 
 
 def signal_handler(sig, frame):
@@ -51,6 +51,20 @@ def signal_handler(sig, frame):
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=str),
     help="Working directory to launch the agent from",
 )
+@click.option(
+    "-p",
+    "--prompt",
+    "prompt_text",
+    type=str,
+    help="Execute a one-time prompt with Claude agent",
+)
+@click.option(
+    "-s",
+    "--session-id",
+    "session_id",
+    type=str,
+    help="Session ID - automatically resumes if exists, creates if not",
+)
 def main(
     orchestrator,
     orchestrator_status,
@@ -60,6 +74,8 @@ def main(
     list_agents,
     show_config,
     working_dir,
+    prompt_text,
+    session_id,
 ):
     """PKM CLI - Personal Knowledge Management framework."""
     # Set up signal handler for graceful shutdown
@@ -76,6 +92,12 @@ def main(
         run_orchestrator_daemon(debug=debug, working_dir=working_dir)
     elif trigger_agent:
         trigger_orchestrator_agent(abbreviation=agent_abbreviation, working_dir=working_dir)
+    elif prompt_text:
+        execute_prompt_with_session(
+            prompt=prompt_text,
+            session_id=session_id,
+            working_dir=working_dir
+        )
     elif list_agents:
         list_agents_handler()
     elif show_config:
