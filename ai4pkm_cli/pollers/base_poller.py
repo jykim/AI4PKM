@@ -10,6 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from ..logger import Logger
+
+logger = Logger()
 
 class BasePoller(ABC):
     """Base class for all pollers with common state management and polling logic."""
@@ -29,9 +32,6 @@ class BasePoller(ABC):
         # Get logger from the subclass's module
         import sys
         module = sys.modules[self.__class__.__module__]
-        self.logger = getattr(module, 'logger', None)
-        if self.logger is None:
-            raise ValueError(f"Logger not found in module {self.__class__.__module__}. Each poller must define 'logger' at module level.")
         self.poller_config = poller_config or {}
         self.vault_path = Path(vault_path) if vault_path else Path.cwd()
         
@@ -52,7 +52,6 @@ class BasePoller(ABC):
         
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._shutdown_event = threading.Event()
         
         self.state = self.load_state()
 
@@ -68,7 +67,7 @@ class BasePoller(ABC):
                 with open(self.state_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except (json.JSONDecodeError, OSError) as e:
-                self.logger.warning(f"Failed to load state from {self.state_file}: {e}")
+                logger.warning(f"Failed to load state from {self.state_file}: {e}")
                 return {}
         
         return {}
@@ -96,7 +95,7 @@ class BasePoller(ABC):
                 json.dump(self.state, f, indent=2, default=str)
             return True
         except OSError as e:
-            self.logger.error(f"Failed to save state to {self.state_file}: {e}")
+            logger.error(f"Failed to save state to {self.state_file}: {e}")
             return False
 
     def update_state(self, **kwargs) -> None:
@@ -127,35 +126,34 @@ class BasePoller(ABC):
         Returns:
             True if successful, False otherwise
         """
-        self.logger.info(f"Running {self.__class__.__name__} once...")
-        
         try:
+            logger.info(f"Running {self.__class__.__name__}", console=True)
+
             success = self.poll()
             
             if success:
-                self.logger.info(f"{self.__class__.__name__} completed successfully")
+                logger.info(f"{self.__class__.__name__} completed successfully", console=True)
             else:
-                self.logger.warning(f"{self.__class__.__name__} completed with errors")
+                logger.warning(f"{self.__class__.__name__} completed with errors", console=True)
             
             self.save_state()
             return success
             
         except Exception as e:
-            self.logger.error(f"{self.__class__.__name__} failed: {e}", exc_info=True)
+            logger.error(f"{self.__class__.__name__} failed: {e}", console=True, exc_info=True)
             self.save_state()
             return False
 
     def start(self) -> None:
         """Start the polling loop in a background thread."""
         if self._running:
-            self.logger.warning(f"{self.__class__.__name__} is already running")
+            logger.warning(f"{self.__class__.__name__} is already running")
             return
         
         self._running = True
-        self._shutdown_event.clear()
         self._thread = threading.Thread(target=self._polling_loop, daemon=True)
         self._thread.start()
-        self.logger.info(f"{self.__class__.__name__} started (interval: {self.poll_interval}s)")
+        logger.info(f"{self.__class__.__name__} started (interval: {self.poll_interval}s)")
 
     def stop(self, timeout: float = 5.0) -> None:
         """
@@ -167,39 +165,41 @@ class BasePoller(ABC):
         if not self._running:
             return
         
-        self.logger.info(f"Stopping {self.__class__.__name__}...")
+        logger.info(f"Stopping {self.__class__.__name__}...")
         self._running = False
-        self._shutdown_event.set()
         
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
             if self._thread.is_alive():
-                self.logger.warning(f"{self.__class__.__name__} thread did not stop within timeout")
+                logger.warning(f"{self.__class__.__name__} thread did not stop within timeout")
             else:
-                self.logger.info(f"{self.__class__.__name__} stopped")
+                logger.info(f"{self.__class__.__name__} stopped")
 
     def _polling_loop(self) -> None:
         """Main polling loop that runs in background thread."""
-        self.logger.info(f"{self.__class__.__name__} polling loop started")
+        logger.info(f"{self.__class__.__name__} polling loop started")
         
         first_run = True
         
         while self._running:
             try:
                 if first_run:
-                    self.logger.info(f"{self.__class__.__name__} running initial poll immediately")
+                    logger.info(f"{self.__class__.__name__} running initial poll immediately", console=True)
                     first_run = False
                 self.run_once()
                 
-                if self._shutdown_event.wait(timeout=self.poll_interval):
+                if not self._running:
+                    logger.error(f"{self.__class__.__name__} polling loop stopped", console=True)
                     break
+                time.sleep(self.poll_interval)
                     
             except Exception as e:
-                self.logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", exc_info=True)
-                if self._shutdown_event.wait(timeout=60):
+                logger.error(f"Error in {self.__class__.__name__} polling loop: {e}", console=True, exc_info=True)
+                if not self._running:
                     break
+                time.sleep(60)
         
-        self.logger.info(f"{self.__class__.__name__} polling loop stopped")
+        logger.info(f"{self.__class__.__name__} polling loop stopped")
 
     def is_running(self) -> bool:
         """Check if poller is currently running."""

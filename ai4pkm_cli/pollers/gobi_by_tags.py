@@ -47,26 +47,26 @@ class GobiByTagsPoller(BasePoller):
             True if successful, False otherwise
         """
         if not self.admin_api_key:
-            self.logger.warning(
+            logger.warning(
                 "admin_api_key not found in secrets.yaml for gobi_by_tags poller. Skipping sync."
             )
             return False
 
         if not self.tags:
-            self.logger.warning(
+            logger.warning(
                 "tags not found in secrets.yaml for gobi_by_tags poller. Skipping sync."
             )
             return False
 
-        self.logger.info("Starting Gobi data sync by tags...")
+        logger.info("Starting Gobi data sync by tags...")
         try:
             local_timezone_setting = self.poller_config.get("local_timezone")
             if local_timezone_setting:
                 timezone_name = local_timezone_setting
-                self.logger.info(f"Using configured timezone: {timezone_name}")
+                logger.info(f"Using configured timezone: {timezone_name}")
             else:
                 timezone_name = str(get_localzone())
-                self.logger.info(f"Using system local timezone: {timezone_name}")
+                logger.info(f"Using system local timezone: {timezone_name}")
 
             tags_param = ','.join(self.tags) if isinstance(self.tags, list) else self.tags
             response = requests.get(
@@ -93,16 +93,16 @@ class GobiByTagsPoller(BasePoller):
                 for target_date, markdown in markdowns.items():
                     self.save_to_file(deviceId, markdown, target_date)
 
-            self.logger.info("Gobi data sync by tags finished successfully.")
+            logger.info("Gobi data sync by tags finished successfully.")
             
             return True
         except Exception as e:
-            self.logger.error(f"An error occurred during Gobi sync by tags: {e}", exc_info=True)
+            logger.error(f"An error occurred during Gobi sync by tags: {e}", exc_info=True)
             return False
 
     def fetch_all_data(self, deviceId: str):
         """Fetch all data from Gobi API for a device."""
-        self.logger.info(f"Fetching recent data for device {deviceId}...")
+        logger.info(f"Fetching recent data for device {deviceId}...")
 
         params = {}
         params["deviceId"] = deviceId
@@ -145,12 +145,12 @@ class GobiByTagsPoller(BasePoller):
             frames.extend(data.get("frames", []))
 
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {e}")
+            logger.error(f"API request failed: {e}")
             if hasattr(e, 'response') and e.response is not None:
-                self.logger.error(f"Response: {e.response.text}")
+                logger.error(f"Response: {e.response.text}")
             return [], []
 
-        self.logger.info(
+        logger.info(
             f"Retrieved {len(transcriptions)} transcriptions and {len(frames)} frames for device {deviceId}."
         )
         return transcriptions, frames
@@ -159,14 +159,14 @@ class GobiByTagsPoller(BasePoller):
         """Download a single frame image."""
         try:
             if not file_path.exists():
-                self.logger.info(f"Downloading frame to {file_path}...")
+                logger.info(f"Downloading frame to {file_path}...")
                 response = requests.get(download_url)
                 response.raise_for_status()
                 with open(file_path, "wb") as f:
                     f.write(response.content)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to download frame {file_path}: {e}")
+            logger.error(f"Failed to download frame {file_path}: {e}")
             return False
 
     def _process_entry(self, entry, local_tz, deviceId):
@@ -221,7 +221,7 @@ class GobiByTagsPoller(BasePoller):
                     download_tasks.append(download_task)
 
         if download_tasks:
-            self.logger.info(
+            logger.info(
                 f"Starting parallel download of {len(download_tasks)} frames..."
             )
             with ThreadPoolExecutor(max_workers=5) as executor:
@@ -238,11 +238,11 @@ class GobiByTagsPoller(BasePoller):
                     try:
                         success = future.result()
                         if not success:
-                            self.logger.warning(
+                            logger.warning(
                                 f"Failed to download frame: {file_path}"
                             )
                     except Exception as e:
-                        self.logger.error(
+                        logger.error(
                             f"Exception during frame download {file_path}: {e}"
                         )
 
@@ -258,10 +258,10 @@ class GobiByTagsPoller(BasePoller):
         filepath = self.output_dir / f"{deviceId}/{target_date}.md"
         try:
             filepath.write_text(content, encoding="utf-8")
-            self.logger.info(f"Saved to: {filepath}")
+            logger.info(f"Saved to: {filepath}")
             return filepath
         except Exception as e:
-            self.logger.error(f"Failed to save file: {e}")
+            logger.error(f"Failed to save file: {e}")
             return None
 
 

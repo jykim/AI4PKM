@@ -36,7 +36,13 @@ class LimitlessPoller(BasePoller):
         
         if not self.api_key:
             self.is_ready = False
-            self.logger.warning("api_key not found in secrets.yaml for limitless poller. Poller will skip.")
+            logger.error(
+                "Limitless poller disabled: api_key not found.\n"
+                "  Add to secrets.yaml:\n"
+                "    pollers:\n"
+                "      limitless:\n"
+                "        api_key: \"your-api-key-here\""
+            )
             return
         
         self.is_ready = True
@@ -62,26 +68,26 @@ class LimitlessPoller(BasePoller):
             return True
 
         if self.is_debug:
-            self.logger.debug("Starting Limitless data sync...")
+            logger.debug("Starting Limitless data sync...")
         try:
             local_timezone_setting = self.poller_config.get("local_timezone")
             if local_timezone_setting:
                 timezone_name = local_timezone_setting
                 if self.is_debug:
-                    self.logger.debug(f"Using configured timezone: {timezone_name}")
+                    logger.debug(f"Using configured timezone: {timezone_name}")
             else:
                 timezone_name = str(get_localzone())
                 if self.is_debug:
-                    self.logger.debug(f"Using system local timezone: {timezone_name}")
+                    logger.debug(f"Using system local timezone: {timezone_name}")
 
             self.sync_missing_dates(timezone_name)
 
             if self.is_debug:
-                self.logger.debug("Limitless data sync finished successfully.")
+                logger.debug("Limitless data sync finished successfully.")
             
             return True
         except Exception as e:
-            self.logger.error(f"An error occurred during Limitless sync: {e}")
+            logger.error(f"An error occurred during Limitless sync: {e}")
             return False
     
     def fetch_all_lifelogs_for_day(self, date_str, timezone_str):
@@ -91,7 +97,7 @@ class LimitlessPoller(BasePoller):
         page_count = 1
 
         if self.is_debug:
-            self.logger.debug("Fetching recent lifelogs...")
+            logger.debug("Fetching recent lifelogs...")
         while True:
             url = f"{self.api_base_url}/lifelogs"
             params = { "limit": 10 }
@@ -117,13 +123,13 @@ class LimitlessPoller(BasePoller):
                 time.sleep(0.5)
 
             except requests.exceptions.RequestException as e:
-                self.logger.error(f"API request failed: {e}")
+                logger.error(f"API request failed: {e}")
                 if hasattr(e, 'response') and e.response is not None:
-                    self.logger.error(f"Response: {e.response.text}")
+                    logger.error(f"Response: {e.response.text}")
                 return None
 
         if self.is_debug:
-            self.logger.debug(f"Retrieved {len(all_recent_lifelogs)} total recent entries. Now filtering for date {date_str}...")
+            logger.debug(f"Retrieved {len(all_recent_lifelogs)} total recent entries. Now filtering for date {date_str}...")
 
         target_date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
         local_tz = pytz.timezone(timezone_str)
@@ -141,7 +147,7 @@ class LimitlessPoller(BasePoller):
                 filtered_lifelogs.append(log)
 
         if self.is_debug:
-            self.logger.debug(f"Found {len(filtered_lifelogs)} entries matching the date {date_str}.")
+            logger.debug(f"Found {len(filtered_lifelogs)} entries matching the date {date_str}.")
         return filtered_lifelogs
 
     def format_lifelogs_markdown(self, lifelogs, timezone_str):
@@ -216,14 +222,14 @@ class LimitlessPoller(BasePoller):
 
         if not lifelogs:
             if self.is_debug:
-                self.logger.debug(f"No data found for {date_str}. Skipping file creation.")
+                logger.debug(f"No data found for {date_str}. Skipping file creation.")
             return False
 
         markdown = self.format_lifelogs_markdown(lifelogs, timezone)
 
         if not markdown.strip():
             if self.is_debug:
-                self.logger.debug(f"No content to save for {date_str}. Skipping file creation.")
+                logger.debug(f"No content to save for {date_str}. Skipping file creation.")
             return False
 
         filepath = self.save_to_file(markdown, date_str)
@@ -234,10 +240,10 @@ class LimitlessPoller(BasePoller):
         filepath = self.output_dir / f"{date_str}.md"
         try:
             filepath.write_text(content, encoding='utf-8')
-            self.logger.info(f"Saved to: {filepath}")
+            logger.info(f"Saved to: {filepath}")
             return filepath
         except Exception as e:
-            self.logger.error(f"Failed to save file: {e}")
+            logger.error(f"Failed to save file: {e}")
             return None
             
     def get_last_sync_date(self) -> str:
@@ -250,14 +256,14 @@ class LimitlessPoller(BasePoller):
             if not files:
                 start_date = (date.today() - timedelta(days=self.start_days_ago)).strftime("%Y-%m-%d")
                 if self.is_debug:
-                    self.logger.debug(f"No previous sync files found. Starting from {self.start_days_ago} days ago.")
+                    logger.debug(f"No previous sync files found. Starting from {self.start_days_ago} days ago.")
                 return start_date
 
             latest_date_str = max(file.stem for file in files)
             return latest_date_str
 
         except Exception as e:
-            self.logger.warning(f"Error finding last sync date: {e}")
+            logger.warning(f"Error finding last sync date: {e}")
             return (date.today() - timedelta(days=self.start_days_ago)).strftime("%Y-%m-%d")
         
     def get_date_range(self, start_dt, end_dt):
@@ -276,12 +282,12 @@ class LimitlessPoller(BasePoller):
         today_date = date.today()
 
         if self.is_debug:
-            self.logger.debug(f"Last sync file found: {last_sync_date.strftime('%Y-%m-%d')}")
-            self.logger.debug(f"Syncing up to today: {today_date.strftime('%Y-%m-%d')}")
+            logger.debug(f"Last sync file found: {last_sync_date.strftime('%Y-%m-%d')}")
+            logger.debug(f"Syncing up to today: {today_date.strftime('%Y-%m-%d')}")
 
         if last_sync_date > today_date:
             if self.is_debug:
-                self.logger.debug("Last sync date is in the future. Syncing today.")
+                logger.debug("Last sync date is in the future. Syncing today.")
             self.sync_date(today_date.strftime("%Y-%m-%d"), timezone)
             self.update_state(last_sync_date=today_date.strftime("%Y-%m-%d"))
             return
@@ -290,23 +296,23 @@ class LimitlessPoller(BasePoller):
 
         if not dates_to_sync:
             if self.is_debug:
-                self.logger.debug("Already up to date! Re-syncing today.")
+                logger.debug("Already up to date! Re-syncing today.")
             self.sync_date(today_date.strftime("%Y-%m-%d"), timezone)
             self.update_state(last_sync_date=today_date.strftime("%Y-%m-%d"))
             return
 
         if self.is_debug:
-            self.logger.debug(f"Syncing {len(dates_to_sync)} day(s): from {dates_to_sync[0]} to {dates_to_sync[-1]}")
+            logger.debug(f"Syncing {len(dates_to_sync)} day(s): from {dates_to_sync[0]} to {dates_to_sync[-1]}")
 
         for date_str in dates_to_sync:
             if self.is_debug:
-                self.logger.debug(f"Syncing {date_str}...")
+                logger.debug(f"Syncing {date_str}...")
             self.sync_date(date_str, timezone)
 
         self.update_state(last_sync_date=today_date.strftime("%Y-%m-%d"))
 
         if self.is_debug:
-            self.logger.debug("Sync process completed.")
+            logger.debug("Sync process completed.")
 
 
 def main():

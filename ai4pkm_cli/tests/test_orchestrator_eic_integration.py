@@ -31,13 +31,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from logger import Logger
 from config import Config
 
+logger = Logger(console_output=True)
 
 class OrchestratorEICIntegrationTest:
     """Integration test for Orchestrator EIC workflow."""
 
     def __init__(self):
         """Initialize test environment."""
-        self.logger = Logger(console_output=True)
 
         # Use CWD as workspace (assumes test runs from vault directory)
         self.workspace_path = os.getcwd()
@@ -65,7 +65,7 @@ class OrchestratorEICIntegrationTest:
             if not os.path.exists(full_path):
                 raise ValueError(f"Invalid test workspace: {full_path} does not exist")
 
-        self.logger.info(f"Using test workspace: {self.workspace_path}")
+        logger.info(f"Using test workspace: {self.workspace_path}")
 
         # Flag for existing daemon
         self.use_existing_daemon = False
@@ -98,13 +98,13 @@ class OrchestratorEICIntegrationTest:
 
     def start_orchestrator(self):
         """Start the orchestrator daemon."""
-        self.logger.info("=" * 80)
-        self.logger.info("STAGE 0: Starting Orchestrator Daemon")
-        self.logger.info("=" * 80)
+        logger.info("=" * 80)
+        logger.info("STAGE 0: Starting Orchestrator Daemon")
+        logger.info("=" * 80)
 
         # Skip if using existing daemon
         if self.use_existing_daemon:
-            self.logger.info("⚠️  Using existing daemon (--use-existing-daemon)")
+            logger.info("⚠️  Using existing daemon (--use-existing-daemon)")
             self.test_results['stages']['daemon_started'] = {
                 'success': True,
                 'timestamp': datetime.now(),
@@ -117,7 +117,7 @@ class OrchestratorEICIntegrationTest:
             daemon_log = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'orchestrator_output.log')
             daemon_log_file = open(daemon_log, 'w')
 
-            self.logger.info(f"  Starting orchestrator from CWD: {self.workspace_path}")
+            logger.info(f"  Starting orchestrator from CWD: {self.workspace_path}")
 
             # Run orchestrator from CWD (inherits working directory from test)
             # Test assumes it's running from vault directory
@@ -133,7 +133,7 @@ class OrchestratorEICIntegrationTest:
             self.daemon_log_path = daemon_log
 
             # Wait for initialization
-            self.logger.info("  Waiting for orchestrator to initialize...")
+            logger.info("  Waiting for orchestrator to initialize...")
             time.sleep(5)
 
             # Check if process is running
@@ -141,13 +141,13 @@ class OrchestratorEICIntegrationTest:
                 daemon_log_file.close()
                 with open(daemon_log, 'r') as f:
                     output = f.read()
-                self.logger.error(f"✗ Orchestrator failed to start")
-                self.logger.error(f"Output:\n{output}")
+                logger.error(f"✗ Orchestrator failed to start")
+                logger.error(f"Output:\n{output}")
                 self.test_results['issues'].append("Orchestrator failed to start")
                 return False
 
-            self.logger.info(f"✓ Orchestrator started (PID: {self.daemon_process.pid})")
-            self.logger.info(f"  Log file: {daemon_log}")
+            logger.info(f"✓ Orchestrator started (PID: {self.daemon_process.pid})")
+            logger.info(f"  Log file: {daemon_log}")
 
             self.test_results['stages']['daemon_started'] = {
                 'success': True,
@@ -158,40 +158,40 @@ class OrchestratorEICIntegrationTest:
             return True
 
         except Exception as e:
-            self.logger.error(f"✗ Failed to start orchestrator: {e}")
+            logger.error(f"✗ Failed to start orchestrator: {e}")
             self.test_results['issues'].append(f"Orchestrator start failed: {e}")
             return False
 
     def stop_orchestrator(self):
         """Stop the orchestrator daemon."""
         if self.use_existing_daemon:
-            self.logger.info("\n⚠️  Leaving daemon running (--use-existing-daemon)")
+            logger.info("\n⚠️  Leaving daemon running (--use-existing-daemon)")
             return
 
         if self.daemon_process:
-            self.logger.info("\nStopping orchestrator...")
+            logger.info("\nStopping orchestrator...")
             try:
                 self.daemon_process.send_signal(signal.SIGTERM)
                 try:
                     self.daemon_process.wait(timeout=5)
-                    self.logger.info("✓ Orchestrator stopped gracefully")
+                    logger.info("✓ Orchestrator stopped gracefully")
                 except subprocess.TimeoutExpired:
-                    self.logger.warning("Orchestrator didn't stop gracefully, forcing...")
+                    logger.warning("Orchestrator didn't stop gracefully, forcing...")
                     self.daemon_process.kill()
                     self.daemon_process.wait()
-                    self.logger.info("✓ Orchestrator force-stopped")
+                    logger.info("✓ Orchestrator force-stopped")
 
                 if hasattr(self, 'daemon_log_file'):
                     self.daemon_log_file.close()
 
             except Exception as e:
-                self.logger.error(f"Error stopping orchestrator: {e}")
+                logger.error(f"Error stopping orchestrator: {e}")
 
     def create_test_clipping(self):
         """Create a test clipping file to trigger EIC."""
-        self.logger.info("=" * 80)
-        self.logger.info("STAGE 1: Creating test clipping file")
-        self.logger.info("=" * 80)
+        logger.info("=" * 80)
+        logger.info("STAGE 1: Creating test clipping file")
+        logger.info("=" * 80)
 
         # Read template
         template_path = os.path.join(
@@ -204,7 +204,7 @@ class OrchestratorEICIntegrationTest:
             with open(template_path, 'r', encoding='utf-8') as f:
                 content = f.read()
         except FileNotFoundError:
-            self.logger.error(f"✗ Template file not found: {template_path}")
+            logger.error(f"✗ Template file not found: {template_path}")
             self.test_results['issues'].append(f"Template not found: {template_path}")
             return False
 
@@ -216,8 +216,8 @@ class OrchestratorEICIntegrationTest:
 
             self.created_files.append(self.test_clipping_path)
 
-            self.logger.info(f"✓ Created test clipping: {self.test_clipping_path}")
-            self.logger.info(f"  File size: {os.path.getsize(self.test_clipping_path)} bytes")
+            logger.info(f"✓ Created test clipping: {self.test_clipping_path}")
+            logger.info(f"  File size: {os.path.getsize(self.test_clipping_path)} bytes")
 
             # Brief wait for file system
             time.sleep(2)
@@ -230,7 +230,7 @@ class OrchestratorEICIntegrationTest:
             return True
 
         except Exception as e:
-            self.logger.error(f"✗ Failed to create test clipping: {e}")
+            logger.error(f"✗ Failed to create test clipping: {e}")
             self.test_results['issues'].append(f"Clipping creation failed: {e}")
             return False
 
@@ -243,9 +243,9 @@ class OrchestratorEICIntegrationTest:
         Returns:
             Path to task file if found, None otherwise
         """
-        self.logger.info("\n" + "=" * 80)
-        self.logger.info("STAGE 2: Waiting for task file creation")
-        self.logger.info("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("STAGE 2: Waiting for task file creation")
+        logger.info("=" * 80)
 
         start_time = time.time()
         task_file = None
@@ -276,8 +276,8 @@ class OrchestratorEICIntegrationTest:
             time.sleep(1)
 
         if task_file:
-            self.logger.info(f"✓ Task file created: {os.path.basename(task_file)}")
-            self.logger.info(f"  Time elapsed: {time.time() - start_time:.1f}s")
+            logger.info(f"✓ Task file created: {os.path.basename(task_file)}")
+            logger.info(f"  Time elapsed: {time.time() - start_time:.1f}s")
 
             # Read and validate
             try:
@@ -288,13 +288,13 @@ class OrchestratorEICIntegrationTest:
                 status_match = re.search(r'status:\s*["\']?(\w+)["\']?', content, re.IGNORECASE)
                 if status_match:
                     status = status_match.group(1)
-                    self.logger.info(f"  Initial status: {status}")
+                    logger.info(f"  Initial status: {status}")
                     if status != 'IN_PROGRESS':
-                        self.logger.warning(f"  ⚠ Expected IN_PROGRESS, got {status}")
+                        logger.warning(f"  ⚠ Expected IN_PROGRESS, got {status}")
                         self.test_results['issues'].append(f"Unexpected initial status: {status}")
 
             except Exception as e:
-                self.logger.warning(f"Could not read task file: {e}")
+                logger.warning(f"Could not read task file: {e}")
 
             self.test_results['stages']['task_created'] = {
                 'success': True,
@@ -303,7 +303,7 @@ class OrchestratorEICIntegrationTest:
                 'elapsed_seconds': time.time() - start_time
             }
         else:
-            self.logger.error(f"✗ Task file not created within {timeout}s")
+            logger.error(f"✗ Task file not created within {timeout}s")
             self.test_results['issues'].append(f"Task file not created within {timeout}s")
             self.test_results['stages']['task_created'] = {
                 'success': False,
@@ -322,9 +322,9 @@ class OrchestratorEICIntegrationTest:
         Returns:
             True if task completed successfully (PROCESSED), False otherwise
         """
-        self.logger.info("\n" + "=" * 80)
-        self.logger.info("STAGE 3: Waiting for task completion")
-        self.logger.info("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("STAGE 3: Waiting for task completion")
+        logger.info("=" * 80)
 
         start_time = time.time()
         last_status = None
@@ -342,7 +342,7 @@ class OrchestratorEICIntegrationTest:
                     current_status = status_match.group(1)
 
                     if current_status != last_status:
-                        self.logger.info(f"  Status changed: {last_status or 'None'} → {current_status}")
+                        logger.info(f"  Status changed: {last_status or 'None'} → {current_status}")
                         status_history.append({
                             'status': current_status,
                             'timestamp': datetime.now(),
@@ -352,15 +352,15 @@ class OrchestratorEICIntegrationTest:
 
                     # Check for completion
                     if current_status in ['PROCESSED', 'FAILED']:
-                        self.logger.info(f"✓ Task reached terminal status: {current_status}")
+                        logger.info(f"✓ Task reached terminal status: {current_status}")
 
                         # Validate output if PROCESSED
                         if current_status == 'PROCESSED':
                             output_match = re.search(r'output:\s*["\']?\[\[([^\]]+)\]\]["\']?', content, re.IGNORECASE)
                             if output_match:
-                                self.logger.info(f"  ✓ Output file: {output_match.group(1)}")
+                                logger.info(f"  ✓ Output file: {output_match.group(1)}")
                             else:
-                                self.logger.warning(f"  ⚠ No output file specified")
+                                logger.warning(f"  ⚠ No output file specified")
 
                         self.test_results['stages']['task_completion'] = {
                             'success': current_status == 'PROCESSED',
@@ -373,12 +373,12 @@ class OrchestratorEICIntegrationTest:
                         return current_status == 'PROCESSED'
 
             except Exception as e:
-                self.logger.warning(f"Error reading task file: {e}")
+                logger.warning(f"Error reading task file: {e}")
 
             time.sleep(5)
 
-        self.logger.error(f"✗ Task did not complete within {timeout}s")
-        self.logger.error(f"  Last status: {last_status}")
+        logger.error(f"✗ Task did not complete within {timeout}s")
+        logger.error(f"  Last status: {last_status}")
         self.test_results['issues'].append(f"Task timeout after {timeout}s, status: {last_status}")
         self.test_results['stages']['task_completion'] = {
             'success': False,
@@ -391,9 +391,9 @@ class OrchestratorEICIntegrationTest:
 
     def check_for_duplicates(self):
         """Check if any duplicate tasks were created."""
-        self.logger.info("\n" + "=" * 80)
-        self.logger.info("VALIDATION: Checking for duplicate tasks")
-        self.logger.info("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("VALIDATION: Checking for duplicate tasks")
+        logger.info("=" * 80)
 
         test_tasks = []
         pattern = r"^\d{4}-\d{2}-\d{2} EIC - .+\.md$"
@@ -412,23 +412,23 @@ class OrchestratorEICIntegrationTest:
                     test_tasks.append(filename)
 
         if len(test_tasks) == 0:
-            self.logger.warning("⚠ No test tasks found")
+            logger.warning("⚠ No test tasks found")
             return False
         elif len(test_tasks) == 1:
-            self.logger.info(f"✓ Exactly one task created (no duplicates)")
+            logger.info(f"✓ Exactly one task created (no duplicates)")
             return True
         else:
-            self.logger.error(f"✗ Multiple tasks created: {len(test_tasks)}")
+            logger.error(f"✗ Multiple tasks created: {len(test_tasks)}")
             for task in test_tasks:
-                self.logger.error(f"  - {task}")
+                logger.error(f"  - {task}")
             self.test_results['issues'].append(f"Duplicate tasks created: {test_tasks}")
             return False
 
     def cleanup(self):
         """Clean up test artifacts."""
-        self.logger.info("\n" + "=" * 80)
-        self.logger.info("CLEANUP: Removing test artifacts")
-        self.logger.info("=" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("CLEANUP: Removing test artifacts")
+        logger.info("=" * 80)
 
         cleaned = 0
         failed = 0
@@ -437,13 +437,13 @@ class OrchestratorEICIntegrationTest:
             try:
                 if os.path.exists(filepath):
                     os.remove(filepath)
-                    self.logger.info(f"✓ Deleted: {os.path.basename(filepath)}")
+                    logger.info(f"✓ Deleted: {os.path.basename(filepath)}")
                     cleaned += 1
             except Exception as e:
-                self.logger.error(f"✗ Failed to delete {filepath}: {e}")
+                logger.error(f"✗ Failed to delete {filepath}: {e}")
                 failed += 1
 
-        self.logger.info(f"\nCleanup summary: {cleaned} deleted, {failed} failed")
+        logger.info(f"\nCleanup summary: {cleaned} deleted, {failed} failed")
 
         self.test_results['cleanup'] = {
             'files_deleted': cleaned,
@@ -507,13 +507,13 @@ STAGE RESULTS
 
     def run(self):
         """Run the complete integration test."""
-        self.logger.info("\n\n")
-        self.logger.info("*" * 80)
-        self.logger.info("*" + " " * 78 + "*")
-        self.logger.info("*" + " " * 15 + "ORCHESTRATOR EIC INTEGRATION TEST" + " " * 31 + "*")
-        self.logger.info("*" + " " * 78 + "*")
-        self.logger.info("*" * 80)
-        self.logger.info("\n")
+        logger.info("\n\n")
+        logger.info("*" * 80)
+        logger.info("*" + " " * 78 + "*")
+        logger.info("*" + " " * 15 + "ORCHESTRATOR EIC INTEGRATION TEST" + " " * 31 + "*")
+        logger.info("*" + " " * 78 + "*")
+        logger.info("*" * 80)
+        logger.info("\n")
 
         try:
             # Stage 0: Start orchestrator
@@ -568,7 +568,7 @@ STAGE RESULTS
             # Generate report
             print("[Report] Generating test report...")
             report = self.generate_report()
-            self.logger.info(report)
+            logger.info(report)
             print(report)
 
             # Save report

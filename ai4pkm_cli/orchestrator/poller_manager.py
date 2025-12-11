@@ -10,7 +10,7 @@ logger = Logger()
 class PollerManager:
     """Manages poller instances based on orchestrator.yaml configuration."""
 
-    def __init__(self, vault_path: Path, config: 'Config', logger_instance: Optional[Any] = None):
+    def __init__(self, vault_path: Path, config: 'Config'):
         """
         Initialize poller manager.
 
@@ -21,7 +21,6 @@ class PollerManager:
         """
         self.vault_path = Path(vault_path)
         self.config = config
-        self.logger = logger_instance or logger
         
         # Map of poller name -> poller instance
         self.pollers: Dict[str, 'BasePoller'] = {}
@@ -32,9 +31,9 @@ class PollerManager:
     def _load_pollers(self) -> None:
         """Load and initialize enabled pollers from config."""
         pollers_config = self.config.get_pollers_config()
-        
+
         if not pollers_config:
-            self.logger.debug("No pollers configuration found")
+            logger.debug("No pollers configuration found")
             return
         
         # Import poller classes
@@ -52,20 +51,19 @@ class PollerManager:
             'gobi_by_tags': GobiByTagsPoller,
             'limitless': LimitlessPoller,
         }
-        
         for poller_name, poller_config in pollers_config.items():
             if not poller_config.get('enabled', False):
-                self.logger.debug(f"Poller '{poller_name}' is disabled, skipping")
+                logger.debug(f"Poller '{poller_name}' is disabled, skipping")
                 continue
             
             if poller_name not in poller_classes:
-                self.logger.warning(f"Unknown poller name: {poller_name}")
+                logger.warning(f"Unknown poller name: {poller_name}")
                 continue
             
             try:
                 target_dir = poller_config.get('target_dir')
                 if not target_dir:
-                    self.logger.error(f"Poller '{poller_name}' missing required 'target_dir'")
+                    logger.error(f"Poller '{poller_name}' missing required 'target_dir'")
                     continue
                 
                 poll_interval = poller_config.get('poll_interval', 3600)
@@ -78,35 +76,35 @@ class PollerManager:
                 )
                 
                 self.pollers[poller_name] = poller
-                self.logger.info(f"Loaded poller: {poller_name} (target: {target_dir}, interval: {poll_interval}s)")
+                logger.info(f"Loaded poller: {poller_name} (target: {target_dir}, interval: {poll_interval}s)", console=True)
                 
             except Exception as e:
-                self.logger.error(f"Failed to load poller '{poller_name}': {e}", exc_info=True)
+                logger.error(f"Failed to load poller '{poller_name}': {e}", exc_info=True)
 
     def start_all(self) -> None:
         """Start all enabled pollers."""
         if not self.pollers:
-            self.logger.info("No pollers to start")
+            logger.info("No pollers to start")
             return
         
-        self.logger.info(f"Starting {len(self.pollers)} poller(s)...")
+        logger.info(f"Starting {len(self.pollers)} poller(s)...")
         for name, poller in self.pollers.items():
             try:
                 poller.start()
             except Exception as e:
-                self.logger.error(f"Failed to start poller '{name}': {e}", exc_info=True)
+                logger.error(f"Failed to start poller '{name}': {e}", exc_info=True)
 
     def stop_all(self) -> None:
         """Stop all running pollers."""
         if not self.pollers:
             return
         
-        self.logger.info(f"Stopping {len(self.pollers)} poller(s)...")
+        logger.info(f"Stopping {len(self.pollers)} poller(s)...")
         for name, poller in self.pollers.items():
             try:
                 poller.stop()
             except Exception as e:
-                self.logger.error(f"Failed to stop poller '{name}': {e}", exc_info=True)
+                logger.error(f"Failed to stop poller '{name}': {e}", exc_info=True)
 
     def get_status(self) -> Dict[str, Dict]:
         """
@@ -143,7 +141,7 @@ class PollerManager:
         
         Stops all running pollers, reloads config, and starts newly configured pollers.
         """
-        self.logger.info("Reloading poller configuration...")
+        logger.info("Reloading poller configuration...")
         
         # Stop all running pollers
         self.stop_all()
@@ -157,5 +155,5 @@ class PollerManager:
         # Start all newly configured pollers
         self.start_all()
         
-        self.logger.info(f"Poller reload complete: {len(self.pollers)} poller(s) loaded")
+        logger.info(f"Poller reload complete: {len(self.pollers)} poller(s) loaded")
 

@@ -11,7 +11,6 @@ from ..logger import Logger
 
 logger = Logger()
 
-
 class ApplePhotosPoller(BasePoller):
     """Poller for processing photos with configurable source and destination folders."""
 
@@ -43,11 +42,11 @@ class ApplePhotosPoller(BasePoller):
         Returns:
             True if successful, False otherwise
         """
-        self.logger.info(
+        logger.info(
             f"Processing photos from: {self.source_folder_path} -> {self.destination_folder_path}"
         )
-        self.logger.info(f"Albums to process: {self.albums}")
-        self.logger.info(f"Looking back {self.days} days")
+        logger.info(f"Albums to process: {self.albums}")
+        logger.info(f"Looking back {self.days} days")
 
         try:
             script_path = os.path.join(
@@ -56,13 +55,13 @@ class ApplePhotosPoller(BasePoller):
             script_path = os.path.abspath(script_path)
             
             if not os.path.exists(script_path):
-                self.logger.error(f"AppleScript not found: {script_path}")
+                logger.error(f"AppleScript not found: {script_path}")
                 return False
             
-            self.logger.info("Exporting photos from Photos app...")
+            logger.info("Exporting photos from Photos app...")
             
             for album in self.albums:
-                self.logger.info(f"Processing album: {album}")
+                logger.info(f"Processing album: {album}")
                 result = subprocess.run(
                     ["osascript", script_path, album, str(self.source_folder_path), str(self.days)], 
                     capture_output=True, text=True, check=True
@@ -81,26 +80,26 @@ class ApplePhotosPoller(BasePoller):
                         elif "Already exists:" in line:
                             skipped_count_msgs["already_exists"] += 1
                         elif any(keyword in line for keyword in ["Exported:", "Processing", "Found", "total photos"]):
-                            self.logger.info(f"AppleScript ({album}): {line}")
+                            logger.info(f"AppleScript ({album}): {line}")
                         else:
-                            self.logger.debug(f"AppleScript ({album}): {line}")
+                            logger.debug(f"AppleScript ({album}): {line}")
                             skipped_count_msgs["other"] += 1
                     
                     if skipped_count_msgs["too_old"] > 0:
-                        self.logger.info(f"AppleScript ({album}): Skipped {skipped_count_msgs['too_old']} photos (too old)")
+                        logger.info(f"AppleScript ({album}): Skipped {skipped_count_msgs['too_old']} photos (too old)")
                     if skipped_count_msgs["already_exists"] > 0:
-                        self.logger.info(f"AppleScript ({album}): Skipped {skipped_count_msgs['already_exists']} photos (already exists)")
+                        logger.info(f"AppleScript ({album}): Skipped {skipped_count_msgs['already_exists']} photos (already exists)")
                     if skipped_count_msgs["other"] > 0:
-                        self.logger.debug(f"AppleScript ({album}): {skipped_count_msgs['other']} other debug messages")
+                        logger.debug(f"AppleScript ({album}): {skipped_count_msgs['other']} other debug messages")
                             
-            self.logger.info("Photo export completed successfully for all albums")
+            logger.info("Photo export completed successfully for all albums")
             
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"AppleScript execution failed for album {album}: {e}")
-            self.logger.error(f"Error output: {e.stderr}")
+            logger.error(f"AppleScript execution failed for album {album}: {e}")
+            logger.error(f"Error output: {e.stderr}")
             return False
         except Exception as e:
-            self.logger.error(f"Error exporting photos: {e}")
+            logger.error(f"Error exporting photos: {e}")
             return False
 
         try:
@@ -134,10 +133,10 @@ class ApplePhotosPoller(BasePoller):
                 script_path = os.path.abspath(script_path)
                 
                 if not os.path.exists(script_path):
-                    self.logger.error(f"Processing script not found: {script_path}")
+                    logger.error(f"Processing script not found: {script_path}")
                     continue
                 
-                self.logger.info(f"Processing: {basename}")
+                logger.info(f"Processing: {basename}")
                 try:
                     result = subprocess.run(
                         [script_path, file, str(self.destination_folder_path)],
@@ -145,27 +144,27 @@ class ApplePhotosPoller(BasePoller):
                     )
                     
                     processed_count += 1
-                    self.logger.info(f"Successfully processed: {basename}")
+                    logger.info(f"Successfully processed: {basename}")
                     
                     script_output = result.stdout.strip() if result.stdout else ""
                     if script_output:
                         for line in script_output.split('\n'):
                             if line.strip():
-                                self.logger.debug(f"Shell script: {line.strip()}")
+                                logger.debug(f"Shell script: {line.strip()}")
                                 
                 except subprocess.CalledProcessError as e:
-                    self.logger.error(f"Failed to process {basename}: {e}")
-                    self.logger.error(f"Error output: {e.stderr}")
+                    logger.error(f"Failed to process {basename}: {e}")
+                    logger.error(f"Error output: {e.stderr}")
                     continue
 
-            self.logger.info(
+            logger.info(
                 f"Photo processing completed: {processed_count} processed, {skipped_count} skipped"
             )
             
             return True
 
         except Exception as e:
-            self.logger.error(f"Error processing photos: {e}")
+            logger.error(f"Error processing photos: {e}")
             return False
 
 
