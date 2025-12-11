@@ -489,11 +489,24 @@ class Orchestrator:
 
         Args:
             agent: AgentDefinition to execute
-            event_data: Event data dictionary
+            event_data: Event data dictionary (may contain 'session_id' key or in 'frontmatter')
             slot_reserved: Whether slot was already reserved
+
+        Returns:
+            ExecutionContext if execution completed, None on error
         """
         try:
-            ctx = self.execution_manager.execute(agent, event_data, slot_reserved=slot_reserved)
+            # Extract session_id from event_data
+            session_id = event_data.get('session_id')
+            if not session_id and 'frontmatter' in event_data:
+                session_id = event_data['frontmatter'].get('session_id')
+            
+            ctx = self.execution_manager.execute(
+                agent, event_data, 
+                slot_reserved=slot_reserved, 
+                session_id=session_id,
+                resume_session=False  # Auto-detect in _execute_claude_code
+            )
 
             if ctx.success:
                 logger.info(f"{agent.abbreviation} completed ({ctx.duration:.1f}s)")
@@ -504,8 +517,11 @@ class Orchestrator:
                     error_msg += f" - {ctx.error_message}"
                 logger.error(error_msg)
 
+            return ctx
+
         except Exception as e:
             logger.error(f"{agent.abbreviation} error: {e}", exc_info=True)
+            return None
 
     def _process_queued_tasks(self):
         """
@@ -845,12 +861,13 @@ class Orchestrator:
             ]
         }
 
-    def trigger_agent_once(self, agent_abbreviation: str) -> Optional[ExecutionContext]:
+    def trigger_agent_once(self, agent_abbreviation: str, session_id: Optional[str] = None) -> Optional[ExecutionContext]:
         """
         Manually trigger an agent once (synchronously).
 
         Args:
             agent_abbreviation: Agent abbreviation (e.g., "GDR", "EIC")
+            session_id: Optional session ID for tracking related executions
 
         Returns:
             ExecutionContext if agent was found and executed, None otherwise
@@ -880,15 +897,73 @@ class Orchestrator:
             'event_type': trigger_event.event_type,
             'is_directory': trigger_event.is_directory,
             'timestamp': trigger_event.timestamp,
-            'frontmatter': trigger_event.frontmatter
+            'frontmatter': trigger_event.frontmatter,
+            'session_id': session_id  # Add session_id to event_data
         }
 
-        # Execute synchronously
+        # Execute synchronously via _execute_agent
         try:
-            ctx = self.execution_manager.execute(agent, event_data, slot_reserved=False)
+            ctx = self._execute_agent(agent, event_data, slot_reserved=False)
             return ctx
         except Exception as e:
             logger.error(f"Error executing agent {agent_abbreviation}: {e}", exc_info=True)
+            return None
+
+    def execute_prompt_with_session(self, prompt: str, session_id: Optional[str] = None) -> Optional[ExecutionContext]:
+        """
+        Execute a one-time prompt with Claude agent and optional session ID.
+        Automatically resumes session if it exists, creates new if it doesn't.
+
+        Args:
+            prompt: The prompt text to execute
+            session_id: Optional session ID for tracking related executions (auto resume/create)
+
+        Returns:
+            ExecutionContext if execution succeeded, None otherwise
+        """
+        from datetime import datetime
+        from .models import AgentDefinition
+
+        # Create a temporary agent definition with claude_code executor
+        agent = AgentDefinition(
+            name="One-time prompt",
+            abbreviation="ONETIME",
+            category="adhoc",
+            trigger_pattern="",
+            trigger_event="manual",
+            prompt_body=prompt,
+            executor="claude_code",  # Always use claude
+            max_parallel=1,
+            timeout_minutes=30,
+            output_path="",
+            output_type="new_file",
+            task_create=False  # Don't create task files for one-time prompts
+        )
+
+        logger.info(f"Executing one-time prompt with Claude (session_id: {session_id or 'none'}, auto resume/create)")
+
+        # Create event data with session_id
+        event_data = {
+            'path': "",
+            'event_type': 'onetime_prompt',
+            'is_directory': False,
+            'timestamp': datetime.now(),
+            'frontmatter': {},
+            'session_id': session_id  # Add session_id to event_data
+        }
+
+        # Execute via _execute_agent (which will extract session_id and pass to execute)
+        try:
+            # Reserve slot first
+            if not self.execution_manager.reserve_slot(agent):
+                logger.error("Cannot execute: concurrency limit reached")
+                return None
+
+            # Execute via _execute_agent (which returns ctx)
+            ctx = self._execute_agent(agent, event_data, slot_reserved=True)
+            return ctx
+        except Exception as e:
+            logger.error(f"Error executing one-time prompt: {e}", exc_info=True)
             return None
 
     def run_forever(self):

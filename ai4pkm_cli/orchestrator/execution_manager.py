@@ -126,7 +126,7 @@ class ExecutionManager:
 
         return True
 
-    def execute(self, agent: AgentDefinition, trigger_data: Dict, slot_reserved: bool = False) -> ExecutionContext:
+    def execute(self, agent: AgentDefinition, trigger_data: Dict, slot_reserved: bool = False, session_id: Optional[str] = None, resume_session: bool = False) -> ExecutionContext:
         """
         Execute an agent task.
 
@@ -134,6 +134,8 @@ class ExecutionManager:
             agent: Agent definition to execute
             trigger_data: Data about the triggering event
             slot_reserved: If True, slot was already reserved by reserve_slot()
+            session_id: Optional session ID for tracking related executions
+            resume_session: If True, resume existing session; if False, create new session
 
         Returns:
             ExecutionContext with execution results
@@ -141,7 +143,9 @@ class ExecutionManager:
         ctx = ExecutionContext(
             agent=agent,
             trigger_data=trigger_data,
-            start_time=datetime.now()
+            start_time=datetime.now(),
+            session_id=session_id,
+            resume_session=resume_session
         )
 
         # Increment counters only if not already reserved
@@ -303,9 +307,42 @@ class ExecutionManager:
             ctx: Execution context
             trigger_data: Trigger event data
         """
-        # Build prompt from agent definition
-        ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Claude CLI', ['claude', '--permission-mode', 'bypassPermissions', '--print', ctx.prompt], agent.timeout_minutes * 60)
+        # For one-time prompts, use just the prompt body without any context
+        if trigger_data.get('event_type') == 'onetime_prompt':
+            ctx.prompt = agent.prompt_body
+        else:
+            # Build prompt from agent definition with full context
+            ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
+        
+        # Build command with optional session ID
+        cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
+        
+        # Add session ID handling: try to create new first, resume if already exists
+        if ctx.session_id:
+            # First try to create new session with --session-id
+            # If it fails because session exists, we'll catch and retry with --resume
+            cmd.extend(['--session-id', ctx.session_id])
+        
+        # Add prompt as final argument
+        cmd.append(ctx.prompt)
+        
+        try:
+            self._execute_subprocess(ctx, 'Claude CLI', cmd, agent.timeout_minutes * 60)
+        except RuntimeError as e:
+            # Check if error is about session already existing
+            error_msg = str(e)
+            # Check both the error message and ctx.error_message (set by _execute_subprocess)
+            full_error = f"{error_msg} {ctx.error_message or ''}"
+            if ctx.session_id and ("already in use" in full_error.lower() or "already exists" in full_error.lower()):
+                # Session exists, retry with --resume
+                logger.info(f"Session {ctx.session_id} already exists, resuming...")
+                # Clear previous error
+                ctx.error_message = None
+                cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id, ctx.prompt]
+                self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60)
+            else:
+                # Re-raise if it's a different error
+                raise
 
     def _execute_gemini_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
