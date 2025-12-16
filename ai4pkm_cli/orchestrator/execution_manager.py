@@ -352,7 +352,7 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo', '--debug'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
+        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -494,6 +494,7 @@ class ExecutionManager:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding='utf-8',
             cwd=str(self.working_dir)
         )
 
