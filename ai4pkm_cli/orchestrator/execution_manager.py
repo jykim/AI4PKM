@@ -314,7 +314,7 @@ class ExecutionManager:
             # Build prompt from agent definition with full context
             ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
         
-        # Build command with optional session ID
+        # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
         
         # Add session ID handling: try to create new first, resume if already exists
@@ -323,11 +323,8 @@ class ExecutionManager:
             # If it fails because session exists, we'll catch and retry with --resume
             cmd.extend(['--session-id', ctx.session_id])
         
-        # Add prompt as final argument
-        cmd.append(ctx.prompt)
-        
         try:
-            self._execute_subprocess(ctx, 'Claude CLI', cmd, agent.timeout_minutes * 60)
+            self._execute_subprocess(ctx, 'Claude CLI', cmd, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
         except RuntimeError as e:
             # Check if error is about session already existing
             error_msg = str(e)
@@ -338,8 +335,8 @@ class ExecutionManager:
                 logger.info(f"Session {ctx.session_id} already exists, resuming...")
                 # Clear previous error
                 ctx.error_message = None
-                cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id, ctx.prompt]
-                self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60)
+                cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
+                self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
             else:
                 # Re-raise if it's a different error
                 raise
@@ -355,7 +352,7 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo', '--debug', ctx.prompt], agent.timeout_minutes * 60)
+        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo', '--debug'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -368,7 +365,7 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', 'exec', '--skip-git-repo-check', '--full-auto', ctx.prompt], agent.timeout_minutes * 60)
+        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_cursor_agent(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -397,10 +394,7 @@ class ExecutionManager:
         if agent.agent_params and agent.agent_params.get('browser', False):
             cmd.append('--browser')
         
-        # Add the prompt as the final argument
-        cmd.append(ctx.prompt)
-        
-        self._execute_subprocess(ctx, 'Cursor Agent', cmd, agent.timeout_minutes * 60)
+        self._execute_subprocess(ctx, 'Cursor Agent', cmd, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_continue_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -463,10 +457,7 @@ class ExecutionManager:
         if agent.agent_params and agent.agent_params.get('readonly', False):
             cmd.append('--readonly')
         
-        # Add the prompt as the final argument
-        cmd.append(ctx.prompt)
-        
-        self._execute_subprocess(ctx, 'Continue CLI', cmd, agent.timeout_minutes * 60)
+        self._execute_subprocess(ctx, 'Continue CLI', cmd, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_grok_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -479,9 +470,9 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Grok CLI', ['grok', '--prompt', ctx.prompt], agent.timeout_minutes * 60)
+        self._execute_subprocess(ctx, 'Grok CLI', ['grok'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
-    def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int):
+    def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int, stdin_input: Optional[str] = None):
         # On Windows, resolve .cmd/.bat files to their full paths
         if platform.system() == 'Windows' and cmd:
             executable = cmd[0]
@@ -499,7 +490,7 @@ class ExecutionManager:
         
         process = subprocess.Popen(
             cmd,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -532,6 +523,22 @@ class ExecutionManager:
         
         stderr_thread.start()
         status_thread.start()
+        
+        # Write stdin input if provided (after starting output reading threads)
+        if stdin_input is not None:
+            try:
+                # Small delay to ensure process has started
+                time.sleep(0.05)
+                process.stdin.write(stdin_input)
+                process.stdin.flush()
+                process.stdin.close()
+            except (BrokenPipeError, OSError, ValueError) as e:
+                # Process may have already exited or stdin was closed
+                logger.warning(f"Failed to write to stdin: {e}")
+                # Check if process already failed
+                if process.poll() is not None:
+                    # Process already exited, we'll catch the error below
+                    pass
 
         try:
             process.wait(timeout=timeout_seconds)
