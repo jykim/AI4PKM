@@ -185,8 +185,8 @@ def execute_prompt_with_session(
         if ctx.session_id:
             logger.info(f"[dim]Session ID: {ctx.session_id}[/dim]")
         # Display the response (cleaned for one-time prompts)
+        logger.info(f"\n[bold cyan]Response:[/bold cyan]")
         if ctx.response:
-            logger.info(f"\n[bold cyan]Response:[/bold cyan]")
             # Clean response: remove [Agent Name] prefixes for cleaner output
             import re
             cleaned_lines = []
@@ -197,7 +197,16 @@ def execute_prompt_with_session(
             logger.info(cleaned_response)
     else:
         error_msg = ctx.error_message if ctx else "Unknown error"
-        logger.error(f"\n[red]✗ Prompt execution failed: {error_msg}[/red]")
+        logger.error(f"\n[red]✗ Prompt execution failed[/red]")
+        logger.info(f"\n[bold cyan]Response:[/bold cyan]")
+        # Clean response: remove [Agent Name] prefixes for cleaner output
+        import re
+        cleaned_lines = []
+        for line in error_msg.split("\n"):
+            cleaned_line = re.sub(r'^\[.*?\]\s*', '', line)
+            cleaned_lines.append(cleaned_line)
+        cleaned_response = "\n".join(cleaned_lines)
+        logger.info(cleaned_response)
     
     return ctx
 
