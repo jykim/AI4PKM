@@ -15,6 +15,7 @@ class AgentDefinition:
     name: str
     abbreviation: str
     category: str  # ingestion, publish, research
+    system_prompt: str
 
     # Trigger specification
     trigger_pattern: str
@@ -83,6 +84,8 @@ class ExecutionContext:
     # File paths
     log_file: Optional[Path] = None
     task_file: Optional[Path] = None  # Path to task tracking file in AI/Tasks/
+
+    system_prompt: Optional[str] = None
 
     @property
     def duration(self) -> Optional[float]:
