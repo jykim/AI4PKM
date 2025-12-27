@@ -15,7 +15,6 @@ class AgentDefinition:
     name: str
     abbreviation: str
     category: str  # ingestion, publish, research
-    system_prompt: str
 
     # Trigger specification
     trigger_pattern: str
@@ -59,6 +58,8 @@ class AgentDefinition:
     version: str = "1.0"
     last_updated: Optional[datetime] = None
 
+    system_prompt: Optional[str] = None
+    
     # Agent-specific parameters from orchestrator.yaml
     agent_params: Dict[str, Any] = field(default_factory=dict)
 
