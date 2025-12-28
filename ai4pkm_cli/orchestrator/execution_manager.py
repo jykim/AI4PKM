@@ -145,8 +145,7 @@ class ExecutionManager:
             trigger_data=trigger_data,
             start_time=datetime.now(),
             session_id=session_id,
-            resume_session=resume_session,
-            system_prompt=agent.system_prompt
+            resume_session=resume_session
         )
 
         # Increment counters only if not already reserved
@@ -318,10 +317,6 @@ class ExecutionManager:
         # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
         
-        # Add system prompt if provided
-        if ctx.system_prompt:
-            cmd.extend(['--system-prompt', ctx.system_prompt])
-        
         # Add session ID handling: try to create new first, resume if already exists
         if ctx.session_id:
             # First try to create new session with --session-id
@@ -341,9 +336,6 @@ class ExecutionManager:
                 # Clear previous error
                 ctx.error_message = None
                 cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
-                # Add system prompt to resume command as well
-                if ctx.system_prompt:
-                    cmd_resume.extend(['--system-prompt', ctx.system_prompt])
                 self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
             else:
                 # Re-raise if it's a different error

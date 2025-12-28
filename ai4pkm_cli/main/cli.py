@@ -52,13 +52,6 @@ def signal_handler(sig, frame):
     help="Working directory to launch the agent from",
 )
 @click.option(
-    "-sp",
-    "--system-prompt",
-    "system_prompt",
-    type=str,
-    help="System prompt to use for the agent",
-)
-@click.option(
     "-p",
     "--prompt",
     "prompt_text",
@@ -81,7 +74,6 @@ def main(
     list_agents,
     show_config,
     working_dir,
-    system_prompt,
     prompt_text,
     session_id,
 ):
@@ -104,8 +96,7 @@ def main(
         execute_prompt_with_session(
             prompt=prompt_text,
             session_id=session_id,
-            working_dir=working_dir,
-            system_prompt=system_prompt
+            working_dir=working_dir
         )
     elif list_agents:
         list_agents_handler()

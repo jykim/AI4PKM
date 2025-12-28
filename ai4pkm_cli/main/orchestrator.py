@@ -137,7 +137,6 @@ def show_orchestrator_status(vault_path: Path = None, working_dir: str = None):
 
 def execute_prompt_with_session(
     prompt: str,
-    system_prompt: str = None,
     session_id: str = None,
     vault_path: Path = None,
     working_dir: str = None
@@ -148,7 +147,6 @@ def execute_prompt_with_session(
 
     Args:
         prompt: The prompt text to execute
-        system_prompt: The system prompt to use for the agent
         session_id: Optional session ID for tracking related executions (auto resume/create)
         vault_path: Path to vault root (defaults to CWD)
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
@@ -177,8 +175,7 @@ def execute_prompt_with_session(
     start_time = time.time()
     ctx = orch.execute_prompt_with_session(
         prompt=prompt,
-        session_id=session_id,
-        system_prompt=system_prompt
+        session_id=session_id
     )
     end_time = time.time()
     execution_time = end_time - start_time
