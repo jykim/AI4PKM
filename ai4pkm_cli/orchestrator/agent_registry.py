@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 import fnmatch
 from croniter import croniter
 
-from .models import AgentDefinition
+from .models import AgentDefinition, WorkerConfig
 from ..markdown_utils import read_frontmatter, extract_body
 from ..logger import Logger
 
@@ -88,22 +88,29 @@ class AgentRegistry:
 
         for node in agent_nodes:
             try:
-                # Extract abbreviation from name field: "Name (ABBR)"
-                abbr = self._extract_abbreviation(node.get('name', ''))
-                if not abbr:
-                    logger.warning(f"Cannot extract abbreviation from: {node.get('name')}")
-                    continue
+                name = node.get('name', '')
+                prompt_ref = node.get('prompt')
 
-                # Find prompt file by abbreviation
-                agent_file = self._find_agent_prompt_file(abbr)
+                # Get prompt reference - explicit 'prompt' field OR fallback to (ABBR) in name
+                if not prompt_ref:
+                    prompt_ref = self._extract_abbreviation(name)
+                    if not prompt_ref:
+                        logger.warning(f"Missing 'prompt' field for: {name}")
+                        continue
+
+                # Derive unique agent ID from name and prompt
+                agent_id = self._derive_agent_id(name, prompt_ref)
+
+                # Find prompt file by prompt reference
+                agent_file = self._find_agent_prompt_file(prompt_ref)
 
                 if agent_file:
-                    agent = self._load_agent(agent_file, node)
+                    agent = self._load_agent(agent_file, node, agent_id)
                     if agent:
-                        self.agents[agent.abbreviation] = agent
-                        logger.info(f"Loaded agent: {agent.abbreviation} ({agent.name})")
+                        self.agents[agent_id] = agent
+                        logger.info(f"Loaded agent: {agent_id} ({name})")
                 else:
-                    logger.warning(f"No prompt file found for agent: {abbr}")
+                    logger.warning(f"No prompt file found for: {prompt_ref}")
             except Exception as e:
                 logger.error(f"Error loading agent from node: {e}")
 
@@ -154,6 +161,29 @@ class AgentRegistry:
         match = re.search(r'\(([A-Z]{3,4})\)$', name)
         return match.group(1) if match else None
 
+    def _derive_agent_id(self, name: str, prompt: str) -> str:
+        """
+        Derive agent ID from name and prompt.
+
+        If name contains " - " separator, extracts suffix and combines with prompt.
+        Otherwise, returns prompt as-is.
+
+        Examples:
+            ("Search Pilot Eval - Gemini", "SPE") → "SPE-Gemini"
+            ("Enrich Ingested Content", "EIC") → "EIC"
+
+        Args:
+            name: Human-readable agent name
+            prompt: Prompt file abbreviation
+
+        Returns:
+            Unique agent ID string
+        """
+        if ' - ' in name:
+            suffix = name.split(' - ')[-1].strip()
+            return f"{prompt}-{suffix}"
+        return prompt
+
     def _load_orchestrator_yaml(self, yaml_path: Path) -> dict:
         """
         Load centralized orchestrator configuration from YAML file.
@@ -184,13 +214,14 @@ class AgentRegistry:
             logger.error(f"Failed to load orchestrator.yaml: {e}")
             return {'agents': {}, 'defaults': {}}
 
-    def _load_agent(self, file_path: Path, node: dict) -> Optional[AgentDefinition]:
+    def _load_agent(self, file_path: Path, node: dict, agent_id: str) -> Optional[AgentDefinition]:
         """
         Load a single agent definition from file and node config.
 
         Args:
             file_path: Path to agent prompt file
             node: Node configuration from orchestrator.yaml
+            agent_id: Unique agent identifier (derived from name and prompt)
 
         Returns:
             AgentDefinition instance or None if invalid
@@ -283,9 +314,23 @@ class AgentRegistry:
         # Get agent_params from node (explicit YAML property)
         agent_params = node.get('agent_params', {})
 
+        # Parse workers list for multi-worker execution
+        workers_config = node.get('workers', [])
+        workers = []
+        for w in workers_config:
+            if isinstance(w, dict) and 'executor' in w and 'label' in w:
+                workers.append(WorkerConfig(
+                    executor=w['executor'],
+                    label=w['label'],
+                    agent_params=w.get('agent_params', {}),
+                    output_path=w.get('output_path')
+                ))
+            else:
+                logger.warning(f"Invalid worker config in {frontmatter['abbreviation']}: {w}")
+
         agent = AgentDefinition(
-            name=frontmatter['title'],
-            abbreviation=frontmatter['abbreviation'],
+            name=node.get('name', frontmatter['title']),
+            abbreviation=agent_id,
             category=frontmatter['category'],
             trigger_pattern=trigger_pattern,
             trigger_event=trigger_event,
@@ -306,7 +351,7 @@ class AgentRegistry:
             executor=executor,
             max_parallel=max_parallel,
             timeout_minutes=timeout_minutes,
-            log_prefix=node.get('log_prefix', frontmatter['abbreviation']),
+            log_prefix=node.get('log_prefix', agent_id),
             log_pattern=node.get('log_pattern', '{timestamp}-{agent}.log'),
             post_process_action=node.get('post_process_action'),
             task_create=task_create,
@@ -314,7 +359,8 @@ class AgentRegistry:
             task_archived=task_archived,
             file_path=file_path,
             version=node.get('version', '1.0'),
-            agent_params=agent_params
+            agent_params=agent_params,
+            workers=workers
         )
 
         return agent

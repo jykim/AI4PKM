@@ -9,6 +9,15 @@ import uuid
 
 
 @dataclass
+class WorkerConfig:
+    """Configuration for a single worker in a multi-worker agent."""
+    executor: str  # claude_code, gemini_cli, etc.
+    label: str     # Human-readable label (e.g., "Claude", "Gemini")
+    agent_params: Dict[str, Any] = field(default_factory=dict)
+    output_path: Optional[str] = None  # Worker-specific output directory
+
+
+@dataclass
 class AgentDefinition:
     """Represents a loaded agent definition."""
     # Basic identity
@@ -40,6 +49,7 @@ class AgentDefinition:
     executor: str = "claude_code"
     max_parallel: int = 1
     timeout_minutes: int = 30
+    workers: List[WorkerConfig] = field(default_factory=list)  # Multi-worker execution
 
     # Post-processing
     post_process_action: Optional[str] = None  # e.g., "remove_trigger_content"

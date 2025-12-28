@@ -347,6 +347,18 @@ class TaskFileManager:
         
         title = f"{agent.abbreviation} - {Path(input_file_path).stem}"
         
+        # Extract base task type and worker label from abbreviation
+        # Worker agents have abbreviation like "SPT-Gemini" or "SPE-GeminiResults-Codex"
+        # For multi-level agents (e.g., SPE-GeminiResults-Codex), we need to split from the RIGHT
+        # to correctly extract: base_task_type="SPE-GeminiResults", worker_label="Codex"
+        if '-' in agent.abbreviation:
+            parts = agent.abbreviation.rsplit('-', 1)  # Split from right
+            base_task_type = parts[0]  # Parent agent ID (e.g., "SPE-GeminiResults")
+            worker_label = parts[1]    # Worker label only (e.g., "Codex")
+        else:
+            base_task_type = agent.abbreviation
+            worker_label = ""
+
         frontmatter_data = {
             'title': title,
             'created': created_time,
@@ -355,9 +367,13 @@ class TaskFileManager:
             'status': initial_status,
             'priority': agent.task_priority,
             'output': "",
-            'task_type': agent.abbreviation,
+            'task_type': base_task_type,  # Base agent abbreviation (e.g., "EIC")
             'generation_log': log_link
         }
+
+        # Add worker_label for multi-worker tasks
+        if worker_label:
+            frontmatter_data['worker_label'] = worker_label
         
         # Add agent_params if available
         if agent.agent_params:

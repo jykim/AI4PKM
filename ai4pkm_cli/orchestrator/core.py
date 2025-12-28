@@ -12,7 +12,7 @@ from queue import Empty
 from .file_monitor import FileSystemMonitor
 from .agent_registry import AgentRegistry
 from .execution_manager import ExecutionManager
-from .models import TriggerEvent, ExecutionContext
+from .models import TriggerEvent, ExecutionContext, AgentDefinition, WorkerConfig
 from ..logger import Logger
 
 logger = Logger()
@@ -429,59 +429,117 @@ class Orchestrator:
 
         # Execute each matching agent
         for agent in matching_agents:
-            # Try to reserve a slot atomically (prevents race conditions)
-            if not self.execution_manager.reserve_slot(agent):
-                # Create QUEUED task instead of dropping
-                import json
-                from datetime import datetime, date
+            # Check if this is a multi-worker agent
+            if agent.workers:
+                # Dispatch to ALL workers in parallel
+                self._dispatch_multi_worker(agent, event_data, trigger_event)
+            else:
+                # Single-worker execution (existing logic)
+                self._dispatch_single_worker(agent, event_data, trigger_event)
 
-                # Convert all date/datetime objects to strings for JSON serialization
-                def make_json_serializable(obj):
-                    """Recursively convert date/datetime objects to ISO strings."""
-                    if isinstance(obj, (datetime, date)):
-                        return obj.isoformat()
-                    elif isinstance(obj, dict):
-                        return {k: make_json_serializable(v) for k, v in obj.items()}
-                    elif isinstance(obj, list):
-                        return [make_json_serializable(item) for item in obj]
-                    else:
-                        return obj
+    def _dispatch_single_worker(self, agent: AgentDefinition, event_data: dict, trigger_event: TriggerEvent):
+        """
+        Dispatch a single-worker agent execution.
 
-                event_data_serializable = make_json_serializable(event_data)
+        Args:
+            agent: Agent definition to execute
+            event_data: Event data dictionary
+            trigger_event: Original trigger event
+        """
+        # Try to reserve a slot atomically (prevents race conditions)
+        if not self.execution_manager.reserve_slot(agent):
+            # Create QUEUED task instead of dropping
+            self._create_queued_task(agent, event_data)
+            logger.info(f"Queued {agent.abbreviation}: concurrency limit reached")
+            return
 
-                # Serialize trigger data (escape quotes for YAML)
-                trigger_data_json = json.dumps(event_data_serializable, ensure_ascii=False).replace('"', '\\"')
+        # Log agent trigger at INFO level for visibility
+        input_filename = Path(trigger_event.path).name if trigger_event.path else "scheduled"
+        logger.info(f"🚀 Triggering {trigger_event.event_type} agent: {agent.abbreviation} ({input_filename})", console=True)
+        logger.debug(f"Starting {agent.abbreviation}: {trigger_event.path}")
 
-                # Create minimal context for task file creation
-                ctx = ExecutionContext(
-                    agent=agent,
-                    trigger_data=event_data,
-                    start_time=datetime.now()
-                )
+        # Execute in background thread (slot already reserved)
+        execution_thread = threading.Thread(
+            target=self._execute_agent,
+            args=(agent, event_data, True),  # slot_reserved=True
+            daemon=True
+        )
+        execution_thread.start()
 
+    def _dispatch_multi_worker(self, agent: AgentDefinition, event_data: dict, trigger_event: TriggerEvent):
+        """
+        Dispatch a multi-worker agent to all configured workers in parallel.
 
-                # Create QUEUED task
-                self.execution_manager.task_manager.create_task_file(
-                    ctx, agent,
-                    initial_status="QUEUED",
-                    trigger_data_json=trigger_data_json
-                )
+        Args:
+            agent: Base agent definition with workers list
+            event_data: Event data dictionary
+            trigger_event: Original trigger event
+        """
+        input_filename = Path(trigger_event.path).name if trigger_event.path else "scheduled"
+        logger.info(f"🚀 Triggering multi-worker agent: {agent.abbreviation} ({input_filename}) with {len(agent.workers)} workers", console=True)
 
-                logger.info(f"Queued {agent.abbreviation}: concurrency limit reached")
+        for worker in agent.workers:
+            # Create worker-specific agent variant
+            worker_agent = self._create_worker_agent_variant(agent, worker)
+
+            # Try to reserve a slot for this worker
+            if not self.execution_manager.reserve_slot(worker_agent):
+                # Create QUEUED task for this worker
+                self._create_queued_task(worker_agent, event_data)
+                logger.info(f"Queued {worker_agent.abbreviation}: concurrency limit reached")
                 continue
 
-            # Log agent trigger at INFO level for visibility
-            input_filename = Path(trigger_event.path).name if trigger_event.path else "scheduled"
-            logger.info(f"🚀 Triggering {trigger_event.event_type} agent: {agent.abbreviation} ({input_filename})", console=True)
-            logger.debug(f"Starting {agent.abbreviation}: {trigger_event.path}")
+            logger.debug(f"Starting worker {worker_agent.abbreviation}: {trigger_event.path}")
 
             # Execute in background thread (slot already reserved)
             execution_thread = threading.Thread(
                 target=self._execute_agent,
-                args=(agent, event_data, True),  # slot_reserved=True
+                args=(worker_agent, event_data, True),  # slot_reserved=True
                 daemon=True
             )
             execution_thread.start()
+
+    def _create_queued_task(self, agent: AgentDefinition, event_data: dict):
+        """
+        Create a QUEUED task file for an agent that couldn't get a slot.
+
+        Args:
+            agent: Agent definition (may be a worker variant)
+            event_data: Event data dictionary
+        """
+        import json
+        from datetime import datetime, date
+
+        # Convert all date/datetime objects to strings for JSON serialization
+        def make_json_serializable(obj):
+            """Recursively convert date/datetime objects to ISO strings."""
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            elif isinstance(obj, dict):
+                return {k: make_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_json_serializable(item) for item in obj]
+            else:
+                return obj
+
+        event_data_serializable = make_json_serializable(event_data)
+
+        # Serialize trigger data (escape quotes for YAML)
+        trigger_data_json = json.dumps(event_data_serializable, ensure_ascii=False).replace('"', '\\"')
+
+        # Create minimal context for task file creation
+        ctx = ExecutionContext(
+            agent=agent,
+            trigger_data=event_data,
+            start_time=datetime.now()
+        )
+
+        # Create QUEUED task
+        self.execution_manager.task_manager.create_task_file(
+            ctx, agent,
+            initial_status="QUEUED",
+            trigger_data_json=trigger_data_json
+        )
 
     def _execute_agent(self, agent, event_data, slot_reserved=False):
         """
@@ -545,8 +603,9 @@ class Orchestrator:
                 if fm.get('status') != 'QUEUED':
                     continue
 
-                # Extract agent abbreviation and trigger data
+                # Extract agent abbreviation, worker label, and trigger data
                 agent_abbr = fm.get('task_type')
+                worker_label = fm.get('worker_label', '')
                 trigger_data_json = fm.get('trigger_data_json')
 
                 if not agent_abbr:
@@ -561,9 +620,9 @@ class Orchestrator:
                         logger.warning(f"Failed to enrich QUEUED task: {task_path.name}")
                         continue
 
-                # Look up agent definition
-                agent = self.agent_registry.agents.get(agent_abbr)
-                if not agent:
+                # Look up base agent definition
+                base_agent = self.agent_registry.agents.get(agent_abbr)
+                if not base_agent:
                     logger.warning(
                         f"Agent '{agent_abbr}' not found for QUEUED task: {task_path.name}. "
                         "Agent may have been removed in configuration reload."
@@ -575,6 +634,23 @@ class Orchestrator:
                     )
                     logger.info(f"Marked QUEUED task as FAILED: {task_path.name}")
                     continue
+
+                # Reconstruct worker agent variant if this was a multi-worker task
+                if worker_label and base_agent.workers:
+                    # Find the matching worker config
+                    worker_config = None
+                    for w in base_agent.workers:
+                        if w.label == worker_label:
+                            worker_config = w
+                            break
+
+                    if worker_config:
+                        agent = self._create_worker_agent_variant(base_agent, worker_config)
+                    else:
+                        logger.warning(f"Worker '{worker_label}' not found in agent '{agent_abbr}', using base agent")
+                        agent = base_agent
+                else:
+                    agent = base_agent
 
                 # Try to reserve a slot atomically
                 if not self.execution_manager.reserve_slot(agent):
@@ -835,6 +911,48 @@ class Orchestrator:
         except Exception as e:
             logger.error(f"Error enriching QUEUED task with trigger data: {e}", exc_info=True)
             return None
+
+    def _create_worker_agent_variant(self, base_agent: AgentDefinition, worker: WorkerConfig) -> AgentDefinition:
+        """
+        Create an agent variant with worker-specific settings.
+
+        Args:
+            base_agent: Base agent definition to copy
+            worker: Worker configuration with executor and label
+
+        Returns:
+            New AgentDefinition with worker-specific settings
+        """
+        from dataclasses import replace
+
+        # Create a copy with worker-specific overrides
+        worker_abbr = f"{base_agent.abbreviation}-{worker.label}"
+
+        # Merge agent_params: base agent params + worker-specific params
+        merged_params = {**base_agent.agent_params, **worker.agent_params}
+
+        # Modify output_naming to include worker label
+        output_naming = base_agent.output_naming
+        if '{agent}' in output_naming:
+            # Replace {agent} pattern to include worker label
+            output_naming = output_naming.replace('{agent}', f'{{agent}}-{worker.label}')
+        else:
+            # Append worker label to filename
+            if output_naming.endswith('.md'):
+                output_naming = output_naming[:-3] + f' - {worker.label}.md'
+            else:
+                output_naming = output_naming + f' - {worker.label}'
+
+        return replace(
+            base_agent,
+            abbreviation=worker_abbr,
+            executor=worker.executor,
+            agent_params=merged_params,
+            output_path=worker.output_path or base_agent.output_path,
+            output_naming=output_naming,
+            log_pattern='{timestamp}-{agent}.log',  # Agent abbr includes worker label
+            workers=[]  # Clear workers list to prevent recursion
+        )
 
     def get_status(self) -> dict:
         """
