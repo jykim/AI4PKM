@@ -1027,13 +1027,14 @@ class Orchestrator:
             logger.error(f"Error executing agent {agent_abbreviation}: {e}", exc_info=True)
             return None
 
-    def execute_prompt_with_session(self, prompt: str, session_id: Optional[str] = None) -> Optional[ExecutionContext]:
+    def execute_prompt_with_session(self, prompt: str, system_prompt: str = None, session_id: Optional[str] = None) -> Optional[ExecutionContext]:
         """
         Execute a one-time prompt with Claude agent and optional session ID.
         Automatically resumes session if it exists, creates new if it doesn't.
 
         Args:
             prompt: The prompt text to execute
+            system_prompt: The system prompt to use for the agent
             session_id: Optional session ID for tracking related executions (auto resume/create)
 
         Returns:
@@ -1045,6 +1046,7 @@ class Orchestrator:
         # Create a temporary agent definition with claude_code executor
         agent = AgentDefinition(
             name="One-time prompt",
+            system_prompt=system_prompt,
             abbreviation="ONETIME",
             category="adhoc",
             trigger_pattern="",
