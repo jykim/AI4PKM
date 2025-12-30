@@ -11,6 +11,7 @@ from .trigger_agent import trigger_orchestrator_agent
 from .list_agents import list_agents as list_agents_handler
 from .show_config import show_config as show_config_handler
 from .orchestrator import run_orchestrator_daemon, show_orchestrator_status, execute_prompt_with_session
+from .interactive import run_interactive_mode
 
 
 def signal_handler(sig, frame):
@@ -72,6 +73,13 @@ def signal_handler(sig, frame):
     type=str,
     help="Session ID - automatically resumes if exists, creates if not",
 )
+@click.option(
+    "-i",
+    "--interactive",
+    "interactive",
+    is_flag=True,
+    help="Launch interactive mode with Claude Code (streaming JSON I/O)",
+)
 def main(
     orchestrator,
     orchestrator_status,
@@ -84,6 +92,7 @@ def main(
     system_prompt,
     prompt_text,
     session_id,
+    interactive,
 ):
     """PKM CLI - Personal Knowledge Management framework."""
     # Set up signal handler for graceful shutdown
@@ -94,7 +103,9 @@ def main(
     else:
         logging.basicConfig(level=logging.INFO)
 
-    if orchestrator_status:
+    if interactive:
+        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt)
+    elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
         run_orchestrator_daemon(debug=debug, working_dir=working_dir)
