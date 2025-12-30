@@ -104,7 +104,7 @@ def main(
         logging.basicConfig(level=logging.INFO)
 
     if interactive:
-        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt)
+        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, session_id=session_id)
     elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
