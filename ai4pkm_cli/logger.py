@@ -76,15 +76,10 @@ class Logger:
         import sys
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Get current thread name
         thread_name = threading.current_thread().name
-        # Always add thread prefix for visibility
         thread_prefix = f"[{thread_name}] "
-
         log_entry = f"[{timestamp}] {thread_prefix}{level}: {message}\n"
 
-        # Add traceback if exc_info is True
         if exc_info:
             exc_type, exc_value, exc_tb = sys.exc_info()
             if exc_type is not None:
@@ -93,11 +88,16 @@ class Logger:
                     log_entry += tb_lines
 
         with self.lock:
-            # Write to main log file (use UTF-8 encoding for Windows compatibility)
-            with open(self.log_file, 'a', encoding='utf-8') as f:
-                f.write(log_entry)
+            try:
+                with open(self.log_file, 'a', encoding='utf-8') as f:
+                    f.write(log_entry)
+            except (PermissionError, OSError) as e:
+                # Log write failed (e.g., OneDrive sync lock) - fail silently
+                # Optionally print to stderr as fallback
+                import sys
+                print(f"[Logger] Failed to write to log file: {e}", file=sys.stderr)
 
-            # Print to console if requested (message only, no formatting)
+            # Print to console if requested
             if console or self.console_output or logging.getLogger().getEffectiveLevel() <= logging.DEBUG:
                 self.console.print(message)
                 
