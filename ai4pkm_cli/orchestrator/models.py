@@ -70,6 +70,8 @@ class AgentDefinition:
 
     system_prompt: Optional[str] = None
     system_prompt_file: Optional[Path] = None
+    append_system_prompt: Optional[str] = None
+    append_system_prompt_file: Optional[Path] = None
     
     # Agent-specific parameters from orchestrator.yaml
     agent_params: Dict[str, Any] = field(default_factory=dict)
@@ -99,6 +101,8 @@ class ExecutionContext:
 
     system_prompt: Optional[str] = None
     system_prompt_file: Optional[Path] = None
+    append_system_prompt: Optional[str] = None
+    append_system_prompt_file: Optional[Path] = None
 
     @property
     def duration(self) -> Optional[float]:

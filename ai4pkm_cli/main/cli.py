@@ -67,6 +67,20 @@ def signal_handler(sig, frame):
     help="Path to file containing system prompt to use for the agent",
 )
 @click.option(
+    "-asp",
+    "--append-system-prompt",
+    "append_system_prompt",
+    type=str,
+    help="Additional system prompt to append to the base system prompt",
+)
+@click.option(
+    "-aspf",
+    "--append-system-prompt-file",
+    "append_system_prompt_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    help="Path to file containing additional system prompt to append",
+)
+@click.option(
     "-p",
     "--prompt",
     "prompt_text",
@@ -98,6 +112,8 @@ def main(
     working_dir,
     system_prompt,
     system_prompt_file,
+    append_system_prompt,
+    append_system_prompt_file,
     prompt_text,
     session_id,
     interactive,
@@ -112,7 +128,7 @@ def main(
         logging.basicConfig(level=logging.INFO)
 
     if interactive:
-        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, session_id=session_id)
+        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id)
     elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
@@ -125,7 +141,9 @@ def main(
             session_id=session_id,
             working_dir=working_dir,
             system_prompt=system_prompt,
-            system_prompt_file=system_prompt_file
+            system_prompt_file=system_prompt_file,
+            append_system_prompt=append_system_prompt,
+            append_system_prompt_file=append_system_prompt_file
         )
     elif list_agents:
         list_agents_handler()

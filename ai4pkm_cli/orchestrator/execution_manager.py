@@ -147,7 +147,9 @@ class ExecutionManager:
             session_id=session_id,
             resume_session=resume_session,
             system_prompt=agent.system_prompt,
-            system_prompt_file=agent.system_prompt_file
+            system_prompt_file=agent.system_prompt_file,
+            append_system_prompt=agent.append_system_prompt,
+            append_system_prompt_file=agent.append_system_prompt_file
         )
 
         # Increment counters only if not already reserved
@@ -326,6 +328,14 @@ class ExecutionManager:
         if ctx.system_prompt:
             cmd.extend(['--system-prompt', ctx.system_prompt])
         
+        # Add append system prompt file if provided
+        if ctx.append_system_prompt_file:
+            cmd.extend(['--append-system-prompt-file', str(ctx.append_system_prompt_file)])
+        
+        # Add append system prompt if provided
+        if ctx.append_system_prompt:
+            cmd.extend(['--append-system-prompt', ctx.append_system_prompt])
+        
         # Add session ID handling: try to create new first, resume if already exists
         if ctx.session_id:
             # First try to create new session with --session-id
@@ -350,6 +360,12 @@ class ExecutionManager:
                 # Add system prompt to resume command
                 if ctx.system_prompt:
                     cmd_resume.extend(['--system-prompt', ctx.system_prompt])
+                # Add append system prompt file to resume command
+                if ctx.append_system_prompt_file:
+                    cmd_resume.extend(['--append-system-prompt-file', str(ctx.append_system_prompt_file)])
+                # Add append system prompt to resume command
+                if ctx.append_system_prompt:
+                    cmd_resume.extend(['--append-system-prompt', ctx.append_system_prompt])
                 self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
             else:
                 # Re-raise if it's a different error
