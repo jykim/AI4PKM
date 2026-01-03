@@ -140,7 +140,7 @@ class StreamParser:
         return False
 
 
-def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True) -> list:
+def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True) -> list:
     """Build Claude CLI command with appropriate flags."""
     cmd = [
         'claude',
@@ -156,6 +156,12 @@ def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None
     
     if system_prompt:
         cmd.extend(['--system-prompt', system_prompt])
+    
+    if append_system_prompt_file:
+        cmd.extend(['--append-system-prompt-file', str(append_system_prompt_file)])
+    
+    if append_system_prompt:
+        cmd.extend(['--append-system-prompt', append_system_prompt])
     
     if session_id:
         if use_resume:
@@ -195,7 +201,7 @@ def _spawn_claude_process(cmd: list, cwd: Path):
     )
 
 
-def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, session_id: str = None):
+def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None):
     """
     Run interactive mode with Claude Code CLI.
     
@@ -206,6 +212,8 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
         working_dir: Working directory for Claude Code (defaults to CWD)
         system_prompt: Optional system prompt for Claude Code
         system_prompt_file: Optional path to file containing system prompt
+        append_system_prompt: Optional additional system prompt to append
+        append_system_prompt_file: Optional path to file containing additional system prompt to append
         session_id: Optional session ID to resume or create
     """
     cwd = Path(working_dir) if working_dir else Path.cwd()
@@ -219,9 +227,9 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
     
     for attempt in range(max_retries):
         if session_id:
-            cmd = _build_claude_cmd(system_prompt, system_prompt_file, session_id, use_resume=use_resume)
+            cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume)
         else:
-            cmd = _build_claude_cmd(system_prompt, system_prompt_file, None)
+            cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, None)
         
         try:
             process = _spawn_claude_process(cmd, cwd)
