@@ -68,7 +68,7 @@ class StreamParser:
         if msg_type == 'stream_event':
             event = msg.get('event', {})
             event_type = event.get('type')
-            
+
             # Content block start - track what type we're receiving
             if event_type == 'content_block_start':
                 block = event.get('content_block', {})
@@ -104,6 +104,15 @@ class StreamParser:
                 self.current_tool_name = None
                 return False
         
+            # Message delta - partial message updates
+            if event_type == 'message_delta':
+                delta = event.get('delta', {})
+                delta_type = delta.get('type')
+
+                if delta.get('stop_reason'):
+                    self.emit('message_delta_stop', delta.get('stop_reason'))
+                return False
+        
         # User message with tool result
         if msg_type == 'user':
             message = msg.get('message', {})
@@ -131,7 +140,7 @@ class StreamParser:
         return False
 
 
-def _build_claude_cmd(system_prompt: str = None, session_id: str = None, use_resume: bool = True) -> list:
+def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True) -> list:
     """Build Claude CLI command with appropriate flags."""
     cmd = [
         'claude',
@@ -141,6 +150,9 @@ def _build_claude_cmd(system_prompt: str = None, session_id: str = None, use_res
         '--verbose',
         '--include-partial-messages',
     ]
+    
+    if system_prompt_file:
+        cmd.extend(['--system-prompt-file', str(system_prompt_file)])
     
     if system_prompt:
         cmd.extend(['--system-prompt', system_prompt])
@@ -183,7 +195,7 @@ def _spawn_claude_process(cmd: list, cwd: Path):
     )
 
 
-def run_interactive_mode(working_dir: str = None, system_prompt: str = None, session_id: str = None):
+def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, session_id: str = None):
     """
     Run interactive mode with Claude Code CLI.
     
@@ -193,6 +205,7 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, ses
     Args:
         working_dir: Working directory for Claude Code (defaults to CWD)
         system_prompt: Optional system prompt for Claude Code
+        system_prompt_file: Optional path to file containing system prompt
         session_id: Optional session ID to resume or create
     """
     cwd = Path(working_dir) if working_dir else Path.cwd()
@@ -206,9 +219,9 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, ses
     
     for attempt in range(max_retries):
         if session_id:
-            cmd = _build_claude_cmd(system_prompt, session_id, use_resume=use_resume)
+            cmd = _build_claude_cmd(system_prompt, system_prompt_file, session_id, use_resume=use_resume)
         else:
-            cmd = _build_claude_cmd(system_prompt, None)
+            cmd = _build_claude_cmd(system_prompt, system_prompt_file, None)
         
         try:
             process = _spawn_claude_process(cmd, cwd)

@@ -69,6 +69,7 @@ class AgentDefinition:
     last_updated: Optional[datetime] = None
 
     system_prompt: Optional[str] = None
+    system_prompt_file: Optional[Path] = None
     
     # Agent-specific parameters from orchestrator.yaml
     agent_params: Dict[str, Any] = field(default_factory=dict)
@@ -97,6 +98,7 @@ class ExecutionContext:
     task_file: Optional[Path] = None  # Path to task tracking file in AI/Tasks/
 
     system_prompt: Optional[str] = None
+    system_prompt_file: Optional[Path] = None
 
     @property
     def duration(self) -> Optional[float]:
