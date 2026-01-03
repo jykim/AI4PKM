@@ -146,7 +146,8 @@ class ExecutionManager:
             start_time=datetime.now(),
             session_id=session_id,
             resume_session=resume_session,
-            system_prompt=agent.system_prompt
+            system_prompt=agent.system_prompt,
+            system_prompt_file=agent.system_prompt_file
         )
 
         # Increment counters only if not already reserved
@@ -318,6 +319,9 @@ class ExecutionManager:
         # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
         
+        if ctx.system_prompt_file:
+            cmd.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
+        
         # Add system prompt if provided
         if ctx.system_prompt:
             cmd.extend(['--system-prompt', ctx.system_prompt])
@@ -341,7 +345,9 @@ class ExecutionManager:
                 # Clear previous error
                 ctx.error_message = None
                 cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
-                # Add system prompt to resume command as well
+                if ctx.system_prompt_file:
+                    cmd_resume.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
+                # Add system prompt to resume command
                 if ctx.system_prompt:
                     cmd_resume.extend(['--system-prompt', ctx.system_prompt])
                 self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60, stdin_input=ctx.prompt)

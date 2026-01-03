@@ -60,6 +60,13 @@ def signal_handler(sig, frame):
     help="System prompt to use for the agent",
 )
 @click.option(
+    "-spf",
+    "--system-prompt-file",
+    "system_prompt_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    help="Path to file containing system prompt to use for the agent",
+)
+@click.option(
     "-p",
     "--prompt",
     "prompt_text",
@@ -90,6 +97,7 @@ def main(
     show_config,
     working_dir,
     system_prompt,
+    system_prompt_file,
     prompt_text,
     session_id,
     interactive,
@@ -104,7 +112,7 @@ def main(
         logging.basicConfig(level=logging.INFO)
 
     if interactive:
-        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, session_id=session_id)
+        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, session_id=session_id)
     elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
@@ -116,7 +124,8 @@ def main(
             prompt=prompt_text,
             session_id=session_id,
             working_dir=working_dir,
-            system_prompt=system_prompt
+            system_prompt=system_prompt,
+            system_prompt_file=system_prompt_file
         )
     elif list_agents:
         list_agents_handler()
