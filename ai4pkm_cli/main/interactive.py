@@ -201,6 +201,41 @@ def _spawn_claude_process(cmd: list, cwd: Path):
     )
 
 
+def _session_exists(session_id: str, cwd: Path) -> bool:
+    """
+    Check if a Claude session exists by looking for its session file.
+    
+    Session files are stored at: ~/.claude/projects/{project-path}/{session-id}.jsonl
+    Project path is derived from cwd (e.g., /Users/foo/bar → -Users-foo-bar)
+    
+    Returns True if session file exists AND has content (size > 0).
+    If file exists but is empty (corrupted), deletes it and returns False.
+    """
+    claude_dir = Path.home() / '.claude' / 'projects'
+    
+    # Convert cwd to Claude's project path format: /Users/foo/bar → -Users-foo-bar
+    project_path = str(cwd.resolve()).replace('/', '-').replace('\\', '-')
+    if project_path.startswith('-'):
+        pass  # Keep leading dash
+    else:
+        project_path = '-' + project_path
+    
+    session_file = claude_dir / project_path / f"{session_id}.jsonl"
+    
+    if not session_file.exists():
+        return False
+    
+    # If file exists but is empty, it's corrupted - delete and treat as new
+    if session_file.stat().st_size == 0:
+        try:
+            session_file.unlink()
+        except Exception:
+            pass  # If we can't delete, let Claude CLI handle the error
+        return False
+    
+    return True
+
+
 def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None):
     """
     Run interactive mode with Claude Code CLI.
@@ -219,182 +254,122 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
     cwd = Path(working_dir) if working_dir else Path.cwd()
     parser = StreamParser()
     
-    # Try with --session-id first (creates new), then --resume if session exists
-    # This matches the behavior in execution_manager.py
+    # Determine whether to use --resume or --session-id by checking if session exists
     use_resume = False
-    max_retries = 2
-    pending_input = [None]  # Store input that triggered retry, to resend
+    if session_id:
+        use_resume = _session_exists(session_id, cwd)
     
-    for attempt in range(max_retries):
-        if session_id:
-            cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume)
-        else:
-            cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, None)
-        
+    cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume)
+    
+    try:
+        process = _spawn_claude_process(cmd, cwd)
+    except FileNotFoundError:
+        print("Error: 'claude' CLI not found. Please install Claude Code CLI.", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error starting Claude CLI: {e}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Event to signal when we're waiting for a response to complete
+    response_complete = threading.Event()
+    running = True
+    
+    def read_stdout():
+        """Background thread to read Claude CLI stdout and emit ai4pkm JSON."""
+        nonlocal running
         try:
-            process = _spawn_claude_process(cmd, cwd)
-        except FileNotFoundError:
-            print("Error: 'claude' CLI not found. Please install Claude Code CLI.", file=sys.stderr)
-            sys.exit(1)
+            for line in process.stdout:
+                if not running:
+                    break
+                line = line.rstrip('\n')
+                if line:
+                    is_result = parser.parse_line(line)
+                    if is_result:
+                        response_complete.set()
         except Exception as e:
-            print(f"Error starting Claude CLI: {e}", file=sys.stderr)
-            sys.exit(1)
-        
-        # Track if we need to retry with different session mode
-        session_retry_needed = threading.Event()
-        session_error_type = [None]
-        
-        # Event to signal when we're waiting for a response to complete
-        response_complete = threading.Event()
-        running = True
-        
-        def read_stdout():
-            """Background thread to read Claude CLI stdout and emit ai4pkm JSON."""
-            nonlocal running
+            parser.emit('error', f"Reader error: {e}")
+        finally:
+            exit_code = process.poll()
+            if exit_code is not None and exit_code != 0:
+                parser.emit('error', f"Claude CLI exited with code {exit_code}")
+            running = False
+            response_complete.set()
+    
+    def read_stderr():
+        """Background thread to read Claude CLI stderr."""
+        try:
+            for line in process.stderr:
+                line = line.rstrip('\n')
+                if line:
+                    parser.emit('error', line)
+        except Exception:
+            pass
+    
+    # Start reader threads
+    reader_thread = threading.Thread(target=read_stdout, daemon=True)
+    reader_thread.start()
+    stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+    stderr_thread.start()
+    
+    # REPL loop
+    try:
+        while running:
             try:
-                for line in process.stdout:
-                    if not running:
-                        break
-                    line = line.rstrip('\n')
-                    if line:
-                        is_result = parser.parse_line(line)
-                        if is_result:
-                            response_complete.set()
+                user_input = input(">> ")
+            except EOFError:
+                print("\nExiting interactive mode...")
+                break
+            except KeyboardInterrupt:
+                print("\nExiting interactive mode...")
+                break
+            
+            if not user_input.strip():
+                continue
+            
+            if process.poll() is not None:
+                print("Claude CLI process terminated unexpectedly.", file=sys.stderr)
+                break
+            
+            response_complete.clear()
+            
+            message = json.dumps({
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": user_input
+                }
+            })
+            
+            try:
+                process.stdin.write(message + '\n')
+                process.stdin.flush()
+            except BrokenPipeError:
+                print("Claude CLI process terminated.", file=sys.stderr)
+                break
             except Exception as e:
-                parser.emit('error', f"Reader error: {e}")
-            finally:
-                exit_code = process.poll()
-                if exit_code is not None and exit_code != 0 and not session_retry_needed.is_set():
-                    parser.emit('error', f"Claude CLI exited with code {exit_code}")
-                running = False
-                response_complete.set()
-        
-        def read_stderr():
-            """Background thread to read Claude CLI stderr and detect session errors."""
-            nonlocal running
+                print(f"Error sending message: {e}", file=sys.stderr)
+                break
+            
+            while running and not response_complete.is_set():
+                if response_complete.wait(timeout=0.1):
+                    break
+                if process.poll() is not None:
+                    running = False
+                    break
+    
+    finally:
+        running = False
+        if process.poll() is None:
             try:
-                for line in process.stderr:
-                    line = line.rstrip('\n')
-                    if line:
-                        line_lower = line.lower()
-                        # Detect session errors that require retry
-                        if session_id and not use_resume:
-                            if 'already in use' in line_lower or 'already exists' in line_lower:
-                                session_error_type[0] = 'exists'
-                                session_retry_needed.set()
-                                running = False
-                                response_complete.set()
-                                return
-                        elif session_id and use_resume:
-                            if 'no conversation found' in line_lower or 'not found' in line_lower:
-                                session_error_type[0] = 'not_found'
-                                session_retry_needed.set()
-                                running = False
-                                response_complete.set()
-                                return
-                        parser.emit('error', line)
+                process.stdin.close()
             except Exception:
                 pass
-        
-        # Start reader threads
-        reader_thread = threading.Thread(target=read_stdout, daemon=True)
-        reader_thread.start()
-        stderr_thread = threading.Thread(target=read_stderr, daemon=True)
-        stderr_thread.start()
-        
-        # REPL loop
-        user_exited = False
-        try:
-            while running:
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.terminate()
                 try:
-                    # If we have pending input from a retry, use that first
-                    if pending_input[0]:
-                        parser.emit('debug', f"Resending pending input: {pending_input[0]}")
-                        user_input = pending_input[0]
-                        pending_input[0] = None
-                    else:
-                        user_input = input(">> ")
-                except EOFError:
-                    print("\nExiting interactive mode...")
-                    user_exited = True
-                    break
-                except KeyboardInterrupt:
-                    print("\nExiting interactive mode...")
-                    user_exited = True
-                    break
-                
-                if not user_input.strip():
-                    continue
-                
-                # Save input BEFORE checking process - session error may happen on startup
-                pending_input[0] = user_input
-                
-                if process.poll() is not None:
-                    if not session_retry_needed.is_set():
-                        print("Claude CLI process terminated unexpectedly.", file=sys.stderr)
-                    break
-                
-                response_complete.clear()
-                
-                message = json.dumps({
-                    "type": "user",
-                    "message": {
-                        "role": "user",
-                        "content": user_input
-                    }
-                })
-                
-                try:
-                    process.stdin.write(message + '\n')
-                    process.stdin.flush()
-                except BrokenPipeError:
-                    if not session_retry_needed.is_set():
-                        print("Claude CLI process terminated.", file=sys.stderr)
-                    break
-                except Exception as e:
-                    print(f"Error sending message: {e}", file=sys.stderr)
-                    pending_input[0] = None  # Don't retry on other errors
-                    break
-                
-                while running and not response_complete.is_set():
-                    if response_complete.wait(timeout=0.1):
-                        break
-                    if process.poll() is not None:
-                        running = False
-                        break
-                
-                # Clear pending input after successful response (no retry needed)
-                if not session_retry_needed.is_set():
-                    pending_input[0] = None
-        
-        finally:
-            running = False
-            if process.poll() is None:
-                try:
-                    process.stdin.close()
-                except Exception:
-                    pass
-                try:
-                    process.wait(timeout=2)
+                    process.wait(timeout=3)
                 except subprocess.TimeoutExpired:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-        
-        # Check if we should retry with different session mode
-        if session_retry_needed.is_set() and attempt < max_retries - 1:
-            if session_error_type[0] == 'exists':
-                parser.emit('info', f"Session exists, resuming: {session_id}")
-                use_resume = True
-                continue
-            elif session_error_type[0] == 'not_found':
-                parser.emit('info', f"Session not found, creating: {session_id}")
-                use_resume = False
-                continue
-        
-        # If user exited or no retry needed, we're done
-        if user_exited or not session_retry_needed.is_set():
-            break
+                    process.kill()
 
