@@ -201,26 +201,73 @@ def _spawn_claude_process(cmd: list, cwd: Path):
     )
 
 
+def _encode_project_path(path: str) -> str:
+    """
+    Encode a path to Claude CLI's project path format.
+    
+    Claude CLI:
+    1. Splits path by separators (/, \\)
+    2. Encodes each part (non-ASCII UTF-8 bytes → dashes)
+    3. Joins with dashes, but skips separator if next part starts with dash
+    
+    Example: /Users/foo/주식AI → -Users-foo------AI
+    
+    Note: macOS returns paths in NFD (decomposed) form, but Claude CLI
+    uses NFC (composed) form, so we normalize first.
+    """
+    import unicodedata
+    # Normalize to NFC (composed form) - macOS uses NFD which has more chars
+    path = unicodedata.normalize('NFC', path)
+    
+    # Split by path separators
+    import re
+    parts = re.split(r'[/\\]', path)
+    
+    encoded_parts = []
+    for part in parts:
+        encoded = []
+        for char in part:
+            if ord(char) > 127:
+                # Non-ASCII: replace each UTF-8 byte with a dash
+                encoded.append('-' * len(char.encode('utf-8')))
+            else:
+                encoded.append(char)
+        encoded_parts.append(''.join(encoded))
+    
+    # Join with dashes, but skip separator if next part starts with dash
+    result = []
+    for i, part in enumerate(encoded_parts):
+        if i > 0 and not part.startswith('-'):
+            result.append('-')
+        result.append(part)
+    
+    return ''.join(result)
+
+
 def _session_exists(session_id: str, cwd: Path) -> bool:
     """
     Check if a Claude session exists by looking for its session file.
     
     Session files are stored at: ~/.claude/projects/{project-path}/{session-id}.jsonl
-    Project path is derived from cwd (e.g., /Users/foo/bar → -Users-foo-bar)
+    Project path is encoded with non-ASCII chars replaced by dashes.
     
     Returns True if session file exists AND has content (size > 0).
     If file exists but is empty (corrupted), deletes it and returns False.
     """
     claude_dir = Path.home() / '.claude' / 'projects'
+    session_filename = f"{session_id}.jsonl"
     
-    # Convert cwd to Claude's project path format: /Users/foo/bar → -Users-foo-bar
-    project_path = str(cwd.resolve()).replace('/', '-').replace('\\', '-')
-    if project_path.startswith('-'):
-        pass  # Keep leading dash
-    else:
+    # Encode path like Claude CLI does (non-ASCII bytes → dashes)
+    project_path = _encode_project_path(str(cwd.resolve()))
+    if not project_path.startswith('-'):
         project_path = '-' + project_path
     
-    session_file = claude_dir / project_path / f"{session_id}.jsonl"
+    session_file = claude_dir / project_path / session_filename
+    
+    print(json.dumps({
+        "type": "debug",
+        "output": f"Checking session: {session_file} (exists: {session_file.exists()})"
+    }), flush=True)
     
     if not session_file.exists():
         return False
@@ -230,7 +277,7 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
         try:
             session_file.unlink()
         except Exception:
-            pass  # If we can't delete, let Claude CLI handle the error
+            pass
         return False
     
     return True
