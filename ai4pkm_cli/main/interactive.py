@@ -301,8 +301,8 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
         else:
             try:
                 first_entry = json.loads(first_line)
-                if first_entry.get('parentUuid') is not None:
-                    invalid_reason = f"Invalid parentUuid: {first_entry.get('parentUuid')}"
+                if 'parentUuid' not in first_entry:
+                    invalid_reason = "Missing parentUuid field"
                 else:
                     is_valid = True
             except json.JSONDecodeError as e:
