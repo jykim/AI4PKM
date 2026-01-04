@@ -35,17 +35,14 @@ def get_latest_release(repo: str) -> Optional[dict]:
 
 def get_release_by_tag(repo: str, tag: str) -> Optional[dict]:
     """Fetch a specific release by tag name."""
-    tags_to_try = [tag, f"v{tag}", tag.lstrip("v")]
-    
-    for t in tags_to_try:
-        try:
-            response = requests.get(
-                f"https://api.github.com/repos/{repo}/releases/tags/{t}", timeout=10
-            )
-            if response.status_code == 200:
-                return response.json()
-        except requests.RequestException:
-            continue
+    try:
+        response = requests.get(
+            f"https://api.github.com/repos/{repo}/releases/tags/{tag}", timeout=10
+        )
+        if response.status_code == 200:
+            return response.json()
+    except requests.RequestException:
+        pass
     return None
 
 

@@ -25,11 +25,6 @@ def get_current_version() -> Optional[str]:
         return None
 
 
-def normalize_version(version: str) -> str:
-    """Normalize version string by removing 'v' prefix if present."""
-    return version.lstrip("v")
-
-
 def get_releases() -> list[dict]:
     """Fetch all releases from GitHub API."""
     try:
@@ -52,15 +47,12 @@ def get_latest_release() -> Optional[dict]:
 
 def get_release_by_tag(tag: str) -> Optional[dict]:
     """Fetch a specific release by tag name."""
-    tags_to_try = [tag, f"v{tag}", tag.lstrip("v")]
-    
-    for t in tags_to_try:
-        try:
-            response = requests.get(f"{GITHUB_API_BASE}/releases/tags/{t}", timeout=10)
-            if response.status_code == 200:
-                return response.json()
-        except requests.RequestException:
-            continue
+    try:
+        response = requests.get(f"{GITHUB_API_BASE}/releases/tags/{tag}", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+    except requests.RequestException:
+        pass
     return None
 
 
@@ -163,7 +155,7 @@ def update_cli(force: bool, target_version: Optional[str], list_releases: bool) 
             click.echo("Error: No releases available.", err=True)
             sys.exit(1)
     
-    release_version = normalize_version(release.get("tag_name", "unknown"))
+    release_version = release.get("tag_name", "unknown")
     zipball_url = release.get("zipball_url")
     
     click.echo(f"Target version:  {release_version}")
