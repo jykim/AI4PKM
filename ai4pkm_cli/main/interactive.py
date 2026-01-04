@@ -251,8 +251,9 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     Session files are stored at: ~/.claude/projects/{project-path}/{session-id}.jsonl
     Project path is encoded with non-ASCII chars replaced by dashes.
     
-    Returns True if session file exists AND has content (size > 0).
-    If file exists but is empty (corrupted), deletes it and returns False.
+    Returns True if session file exists AND is valid.
+    A valid session file must have a first line that is JSON with parentUuid: null.
+    If file exists but is invalid/corrupted, deletes it and returns False.
     """
     # Both possible Claude session directories
     claude_dirs = [
@@ -275,16 +276,55 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
             "output": f"Checking session: {session_file} (exists: {session_file.exists()})"
         }), flush=True)
         
-        if session_file.exists():
-            # If file exists but is empty, it's corrupted - delete and treat as new
-            if session_file.stat().st_size == 0:
-                try:
-                    session_file.unlink()
-                except Exception:
-                    pass
-                continue  # Check next location
-            
+        if not session_file.exists():
+            continue
+        
+        # Validate session file: first line must be JSON with parentUuid: null
+        try:
+            with open(session_file, 'r', encoding='utf-8') as f:
+                first_line = f.readline().strip()
+        except (IOError, OSError, PermissionError) as e:
+            # File exists but can't be read - likely locked by another process
+            # Assume it's valid and in use
+            print(json.dumps({
+                "type": "debug",
+                "output": f"Session file locked/in-use, assuming valid: {e}"
+            }), flush=True)
             return True
+        
+        # File was read successfully - now validate content
+        is_valid = False
+        invalid_reason = None
+        
+        if not first_line:
+            invalid_reason = "Empty session file"
+        else:
+            try:
+                first_entry = json.loads(first_line)
+                if first_entry.get('parentUuid') is not None:
+                    invalid_reason = f"Invalid parentUuid: {first_entry.get('parentUuid')}"
+                else:
+                    is_valid = True
+            except json.JSONDecodeError as e:
+                invalid_reason = f"Invalid JSON: {e}"
+        
+        if is_valid:
+            print(json.dumps({
+                "type": "debug",
+                "output": f"Session file valid (parentUuid: null)"
+            }), flush=True)
+            return True
+        
+        # Invalid/corrupted session file - delete and treat as new
+        print(json.dumps({
+            "type": "debug",
+            "output": f"Invalid session file, deleting: {invalid_reason}"
+        }), flush=True)
+        try:
+            session_file.unlink()
+        except Exception:
+            pass
+        continue  # Check next location
     
     return False
 
