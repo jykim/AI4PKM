@@ -279,11 +279,10 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
         if not session_file.exists():
             continue
         
-        # Validate session file: first 2 lines must be valid JSON with parentUuid field
+        # Validate session file: first non-queue-operation line must have parentUuid field
         try:
             with open(session_file, 'r', encoding='utf-8') as f:
-                first_line = f.readline().strip()
-                second_line = f.readline().strip()
+                lines = [f.readline().strip() for _ in range(10)]  # Read up to 10 lines
         except (IOError, OSError, PermissionError) as e:
             # File exists but can't be read - likely locked by another process
             # Assume it's valid and in use
@@ -297,18 +296,27 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
         is_valid = False
         invalid_reason = None
         
-        if not first_line and not second_line:
+        # Filter out empty lines
+        lines = [line for line in lines if line]
+        
+        if not lines:
             invalid_reason = "Empty session file"
         else:
             try:
-                first_entry = json.loads(first_line) if first_line else {}
-                second_entry = json.loads(second_line) if second_line else {}
+                # Find first non-queue-operation entry
+                first_entry = None
+                for line in lines:
+                    entry = json.loads(line)
+                    if entry.get('type') != 'queue-operation':
+                        first_entry = entry
+                        break
                 
-                # Valid if either line has parentUuid field
-                if 'parentUuid' in first_entry or 'parentUuid' in second_entry:
+                if first_entry is None:
+                    invalid_reason = "No non-queue-operation entries found"
+                elif 'parentUuid' in first_entry:
                     is_valid = True
                 else:
-                    invalid_reason = "Neither of first 2 lines has parentUuid field"
+                    invalid_reason = "First entry missing parentUuid field"
             except json.JSONDecodeError as e:
                 invalid_reason = f"Invalid JSON: {e}"
         
