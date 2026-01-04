@@ -207,7 +207,10 @@ def _encode_project_path(path: str) -> str:
     
     Claude CLI:
     1. Splits path by separators (/, \\)
-    2. Encodes each part (non-ASCII UTF-8 bytes → dashes)
+    2. Encodes each part:
+       - keeps ASCII alphanumerics as-is
+       - converts all other characters to dashes
+       - non-ASCII characters are converted to dashes based on UTF-8 byte length
     3. Joins with dashes, but skips separator if next part starts with dash
     
     Example: /Users/foo/주식AI → -Users-foo------AI
@@ -216,31 +219,30 @@ def _encode_project_path(path: str) -> str:
     uses NFC (composed) form, so we normalize first.
     """
     import unicodedata
-    # Normalize to NFC (composed form) - macOS uses NFD which has more chars
-    path = unicodedata.normalize('NFC', path)
-    
-    # Split by path separators
     import re
-    parts = re.split(r'[/\\]', path)
-    
-    encoded_parts = []
-    for part in parts:
-        encoded = []
-        for char in part:
-            if ord(char) > 127:
-                # Non-ASCII: replace each UTF-8 byte with a dash
-                encoded.append('-' * len(char.encode('utf-8')))
+
+    def _encode_part(part: str) -> str:
+        out = []
+        for ch in part:
+            if ch.isascii() and ch.isalnum():
+                out.append(ch)
+            elif ch.isascii():
+                out.append('-')
             else:
-                encoded.append(char)
-        encoded_parts.append(''.join(encoded))
-    
+                # Non-ASCII: one dash per UTF-8 byte
+                out.append('-' * len(ch.encode('utf-8')))
+        return ''.join(out)
+
+    # Normalize to NFC (composed form) - macOS often uses NFD which has more chars
+    normalized = unicodedata.normalize('NFC', path)
+    encoded_parts = [_encode_part(p) for p in re.split(r'[/\\]', normalized)]
+
     # Join with dashes, but skip separator if next part starts with dash
     result = []
     for i, part in enumerate(encoded_parts):
-        if i > 0 and not part.startswith('-'):
+        if i and part and not part.startswith('-'):
             result.append('-')
         result.append(part)
-    
     return ''.join(result)
 
 
@@ -264,8 +266,6 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     
     # Encode path like Claude CLI does (non-ASCII bytes → dashes)
     project_path = _encode_project_path(str(cwd.resolve()))
-    if not project_path.startswith('-'):
-        project_path = '-' + project_path
     
     # Check both possible locations
     for claude_dir in claude_dirs:
