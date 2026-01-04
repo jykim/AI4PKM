@@ -12,6 +12,8 @@ from .list_agents import list_agents as list_agents_handler
 from .show_config import show_config as show_config_handler
 from .orchestrator import run_orchestrator_daemon, show_orchestrator_status, execute_prompt_with_session
 from .interactive import run_interactive_mode
+from .update import update_cli
+from .template import template_group
 
 
 def signal_handler(sig, frame):
@@ -20,7 +22,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-@click.command()
+@click.group(invoke_without_command=True)
 @click.option(
     "-o",
     "--orchestrator",
@@ -37,10 +39,11 @@ def signal_handler(sig, frame):
     "-t",
     "--trigger-agent",
     "trigger_agent",
-    is_flag=True,
-    help="Trigger an orchestrator agent interactively once",
+    is_flag=False,
+    flag_value="",
+    default=None,
+    help="Trigger an orchestrator agent (optionally specify abbreviation, e.g., -t EIC)",
 )
-@click.argument("agent_abbreviation", required=False)
 @click.option("-d", "--debug", is_flag=True, help="Enable debug logging")
 @click.option(
     "--list-agents", is_flag=True, help="List available AI agents and their status"
@@ -101,11 +104,12 @@ def signal_handler(sig, frame):
     is_flag=True,
     help="Launch interactive mode with Claude Code (streaming JSON I/O)",
 )
+@click.pass_context
 def main(
+    ctx,
     orchestrator,
     orchestrator_status,
     trigger_agent,
-    agent_abbreviation,
     debug,
     list_agents,
     show_config,
@@ -127,14 +131,20 @@ def main(
     else:
         logging.basicConfig(level=logging.INFO)
 
+    # If a subcommand was invoked, let it handle execution
+    if ctx.invoked_subcommand is not None:
+        return
+
+    # Handle legacy flag-based commands
     if interactive:
         run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id)
     elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
         run_orchestrator_daemon(debug=debug, working_dir=working_dir)
-    elif trigger_agent:
-        trigger_orchestrator_agent(abbreviation=agent_abbreviation, working_dir=working_dir)
+    elif trigger_agent is not None:
+        # trigger_agent can be "" (flag used without value) or an abbreviation string
+        trigger_orchestrator_agent(abbreviation=trigger_agent or None, working_dir=working_dir)
     elif prompt_text:
         execute_prompt_with_session(
             prompt=prompt_text,
@@ -150,9 +160,13 @@ def main(
     elif show_config:
         show_config_handler()
     else:
-        click.echo(main.get_help(click.get_current_context()))
+        click.echo(ctx.get_help())
+
+
+# Register subcommands
+main.add_command(update_cli, name="update")
+main.add_command(template_group, name="template")
 
 
 if __name__ == "__main__":
     main()
-
