@@ -254,7 +254,11 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     Returns True if session file exists AND has content (size > 0).
     If file exists but is empty (corrupted), deletes it and returns False.
     """
-    claude_dir = Path.home() / '.claude' / 'projects'
+    # Both possible Claude session directories
+    claude_dirs = [
+        Path.home() / '.claude' / 'projects',
+        Path.home() / 'projects',
+    ]
     session_filename = f"{session_id}.jsonl"
     
     # Encode path like Claude CLI does (non-ASCII bytes → dashes)
@@ -262,25 +266,27 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     if not project_path.startswith('-'):
         project_path = '-' + project_path
     
-    session_file = claude_dir / project_path / session_filename
+    # Check both possible locations
+    for claude_dir in claude_dirs:
+        session_file = claude_dir / project_path / session_filename
+        
+        print(json.dumps({
+            "type": "debug",
+            "output": f"Checking session: {session_file} (exists: {session_file.exists()})"
+        }), flush=True)
+        
+        if session_file.exists():
+            # If file exists but is empty, it's corrupted - delete and treat as new
+            if session_file.stat().st_size == 0:
+                try:
+                    session_file.unlink()
+                except Exception:
+                    pass
+                continue  # Check next location
+            
+            return True
     
-    print(json.dumps({
-        "type": "debug",
-        "output": f"Checking session: {session_file} (exists: {session_file.exists()})"
-    }), flush=True)
-    
-    if not session_file.exists():
-        return False
-    
-    # If file exists but is empty, it's corrupted - delete and treat as new
-    if session_file.stat().st_size == 0:
-        try:
-            session_file.unlink()
-        except Exception:
-            pass
-        return False
-    
-    return True
+    return False
 
 
 def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None):
