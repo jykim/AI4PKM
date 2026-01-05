@@ -123,6 +123,31 @@ class StreamParser:
                     self.emit('tool_end', result_content)
             return False
         
+        # Assistant message with error (e.g., API key errors, authentication failures)
+        # These are non-streaming responses that contain error info at the root level
+        if msg_type == 'assistant':
+            error_type = msg.get('error')
+            if not error_type:
+                return False
+            
+            # Extract text content from the message
+            message = msg.get('message', {})
+            content = message.get('content', [])
+            text_parts = [
+                item.get('text', '')
+                for item in content
+                if isinstance(item, dict) and item.get('type') == 'text' and item.get('text')
+            ]
+            
+            if text_parts:
+                combined_text = ' '.join(text_parts)
+                self.emit('text', f"[{error_type}] {combined_text}")
+            else:
+                # Fallback if no text content
+                self.emit('text', f"[{error_type}]")
+            
+            return False
+        
         # Result message - final summary with all available info
         if msg_type == 'result':
             result_info = {
@@ -134,6 +159,11 @@ class StreamParser:
                 'total_cost_usd': msg.get('total_cost_usd'),
                 'usage': msg.get('usage'),
             }
+            
+            # Include error message if present
+            if msg.get('is_error') and msg.get('result'):
+                result_info['error_message'] = msg.get('result')
+            
             self.emit('result', result_info)
             return True
         
