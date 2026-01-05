@@ -7,13 +7,13 @@ import click
 import logging
 from pathlib import Path
 
-from .trigger_agent import trigger_orchestrator_agent
 from .list_agents import list_agents as list_agents_handler
 from .show_config import show_config as show_config_handler
 from .orchestrator import run_orchestrator_daemon, show_orchestrator_status, execute_prompt_with_session
 from .interactive import run_interactive_mode
 from .update import update_cli
 from .template import template_group
+from .trigger import trigger_cli
 
 
 def signal_handler(sig, frame):
@@ -34,15 +34,6 @@ def signal_handler(sig, frame):
     "--orchestrator-status",
     is_flag=True,
     help="Show orchestrator status and loaded agents",
-)
-@click.option(
-    "-t",
-    "--trigger-agent",
-    "trigger_agent",
-    is_flag=False,
-    flag_value="",
-    default=None,
-    help="Trigger an orchestrator agent (optionally specify abbreviation, e.g., -t EIC)",
 )
 @click.option("-d", "--debug", is_flag=True, help="Enable debug logging")
 @click.option(
@@ -109,7 +100,6 @@ def main(
     ctx,
     orchestrator,
     orchestrator_status,
-    trigger_agent,
     debug,
     list_agents,
     show_config,
@@ -131,6 +121,11 @@ def main(
     else:
         logging.basicConfig(level=logging.INFO)
 
+    # Store common options in context for subcommands
+    ctx.ensure_object(dict)
+    ctx.obj["working_dir"] = working_dir
+    ctx.obj["debug"] = debug
+
     # If a subcommand was invoked, let it handle execution
     if ctx.invoked_subcommand is not None:
         return
@@ -142,9 +137,6 @@ def main(
         show_orchestrator_status(working_dir=working_dir)
     elif orchestrator:
         run_orchestrator_daemon(debug=debug, working_dir=working_dir)
-    elif trigger_agent is not None:
-        # trigger_agent can be "" (flag used without value) or an abbreviation string
-        trigger_orchestrator_agent(abbreviation=trigger_agent or None, working_dir=working_dir)
     elif prompt_text:
         execute_prompt_with_session(
             prompt=prompt_text,
@@ -164,6 +156,7 @@ def main(
 
 
 # Register subcommands
+main.add_command(trigger_cli, name="trigger")
 main.add_command(update_cli, name="update")
 main.add_command(template_group, name="template")
 
