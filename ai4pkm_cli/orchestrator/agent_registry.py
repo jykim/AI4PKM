@@ -82,8 +82,11 @@ class AgentRegistry:
             logger.warning("No nodes defined in orchestrator.yaml")
             return
 
-        # Filter for agent nodes
-        agent_nodes = [n for n in nodes if n.get('type') == 'agent']
+        # Filter for enabled agent nodes (enabled defaults to True if not specified)
+        agent_nodes = [n for n in nodes if n.get('type') == 'agent' and n.get('enabled', True)]
+        disabled_count = len([n for n in nodes if n.get('type') == 'agent' and not n.get('enabled', True)])
+        if disabled_count > 0:
+            logger.info(f"Skipping {disabled_count} disabled agent(s)")
         logger.info(f"Loading {len(agent_nodes)} agents from orchestrator.yaml")
 
         for node in agent_nodes:
