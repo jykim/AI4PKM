@@ -60,9 +60,8 @@ class AgentRegistry:
         self.config = config or Config()
         self.agents: Dict[str, AgentDefinition] = {}
 
-        # Load centralized orchestrator configuration
-        orchestrator_yaml_path = vault_path / "orchestrator.yaml"
-        self.orchestrator_config = self._load_orchestrator_yaml(orchestrator_yaml_path)
+        # Use orchestrator config from Config instance (respects --config-file CLI option)
+        self.orchestrator_config = self.config.config
 
         # Extract orchestrator runtime settings from YAML
         self.orchestrator_settings = self.orchestrator_config.get('orchestrator', {})
