@@ -201,7 +201,59 @@ Task routing is defined in `ai4pkm_cli.json`:
 
 ---
 
-### 8. AI Agent Management
+### 8. Vault Template Management
+
+Create a new vault from pre-configured templates:
+
+```bash
+# List available templates
+ai4pkm template list
+
+# Install template to a directory
+ai4pkm template install ai4pkm ~/my-vault
+
+# Install specific version
+ai4pkm template install ai4pkm ~/my-vault --version v1.0.0
+
+# Force overwrite existing files
+ai4pkm template install ai4pkm ~/my-vault --force
+```
+
+**Available Templates:**
+- **ai4pkm**: AI4PKM starter vault with default configuration (from [ai4pkm-vault](https://github.com/jykim/ai4pkm-vault))
+
+---
+
+### 9. Agent Trigger
+
+Manually trigger an orchestrator agent by name:
+
+```bash
+# Trigger agent by name (abbreviation or full name)
+ai4pkm trigger EIC
+ai4pkm trigger "Enrich Ingested Content"
+
+# With specific input file
+ai4pkm trigger EIC --input ~/vault/Ingest/Clippings/article.md
+```
+
+---
+
+### 10. Self-Update
+
+Update the AI4PKM CLI to the latest version:
+
+```bash
+# Update to latest release
+ai4pkm update
+
+# Check current version
+ai4pkm --version
+```
+
+---
+
+### 11. AI Agent Management
 
 The CLI supports multiple AI agents. Manage them using these commands:
 
