@@ -14,9 +14,9 @@ import requests
 # Template registry: maps template names to GitHub repos and vault folders
 TEMPLATE_REGISTRY = {
     "ai4pkm": {
-        "repo": "jykim/obsidian_vault_templates",
+        "repo": "jykim/ai4pkm-vault",
         "description": "AI4PKM starter vault with default configuration",
-        "vault_folder": "ai4pkm_vault",
+        "vault_folder": ".",
     },
 }
 
