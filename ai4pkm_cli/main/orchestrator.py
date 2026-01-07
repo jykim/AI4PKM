@@ -12,7 +12,7 @@ from ..logger import Logger
 logger = Logger(console_output=True)
 
 
-def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None):
+def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None):
     """
     Run orchestrator in daemon mode.
 
@@ -20,11 +20,12 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
         vault_path: Path to vault root (defaults to CWD)
         debug: Enable debug logging to console
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
+        config_file: Path to orchestrator config file (defaults to orchestrator.yaml in working directory)
     """
     from ..config import Config
-    
-    config = Config()
-    
+
+    config = Config(config_file=str(config_file) if config_file else None)
+
     # Use CWD as vault (requires config file in CWD)
     vault_path = vault_path or Path.cwd()
     max_concurrent = config.get_orchestrator_max_concurrent()
@@ -81,18 +82,19 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
     orch.run_forever()
 
 
-def show_orchestrator_status(vault_path: Path = None, working_dir: str = None):
+def show_orchestrator_status(vault_path: Path = None, working_dir: str = None, config_file: Path = None):
     """
     Show orchestrator status and loaded agents.
 
     Args:
         vault_path: Path to vault root (defaults to CWD)
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
+        config_file: Path to orchestrator config file (defaults to orchestrator.yaml in working directory)
     """
     from ..config import Config
-    
-    config = Config()
-    
+
+    config = Config(config_file=str(config_file) if config_file else None)
+
     # Use CWD as vault (requires config file in CWD)
     vault_path = vault_path or Path.cwd()
 
@@ -143,7 +145,8 @@ def execute_prompt_with_session(
     append_system_prompt_file: Path = None,
     session_id: str = None,
     vault_path: Path = None,
-    working_dir: str = None
+    working_dir: str = None,
+    config_file: Path = None
 ):
     """
     Execute a one-time prompt with Claude agent and optional session ID.
@@ -158,13 +161,14 @@ def execute_prompt_with_session(
         session_id: Optional session ID for tracking related executions (auto resume/create)
         vault_path: Path to vault root (defaults to CWD)
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
+        config_file: Path to orchestrator config file (defaults to orchestrator.yaml in working directory)
     """
     from ..config import Config
     import time
-    
-    config = Config()
+
+    config = Config(config_file=str(config_file) if config_file else None)
     vault_path = vault_path or Path.cwd()
-    
+
     logger.info(Panel.fit(
         f"[bold cyan]Executing One-Time Prompt[/bold cyan]\n"
         f"Session ID: {session_id or '(none)'}\n"

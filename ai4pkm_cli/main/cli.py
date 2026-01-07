@@ -35,6 +35,13 @@ def signal_handler(sig, frame):
     is_flag=True,
     help="Show orchestrator status and loaded agents",
 )
+@click.option(
+    "-c",
+    "--config-file",
+    "config_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    help="Path to orchestrator config file (default: orchestrator.yaml in working directory)",
+)
 @click.option("-d", "--debug", is_flag=True, help="Enable debug logging")
 @click.option(
     "--list-agents", is_flag=True, help="List available AI agents and their status"
@@ -100,6 +107,7 @@ def main(
     ctx,
     orchestrator,
     orchestrator_status,
+    config_file,
     debug,
     list_agents,
     show_config,
@@ -124,6 +132,7 @@ def main(
     # Store common options in context for subcommands
     ctx.ensure_object(dict)
     ctx.obj["working_dir"] = working_dir
+    ctx.obj["config_file"] = config_file
     ctx.obj["debug"] = debug
 
     # If a subcommand was invoked, let it handle execution
@@ -134,14 +143,15 @@ def main(
     if interactive:
         run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id)
     elif orchestrator_status:
-        show_orchestrator_status(working_dir=working_dir)
+        show_orchestrator_status(working_dir=working_dir, config_file=config_file)
     elif orchestrator:
-        run_orchestrator_daemon(debug=debug, working_dir=working_dir)
+        run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file)
     elif prompt_text:
         execute_prompt_with_session(
             prompt=prompt_text,
             session_id=session_id,
             working_dir=working_dir,
+            config_file=config_file,
             system_prompt=system_prompt,
             system_prompt_file=system_prompt_file,
             append_system_prompt=append_system_prompt,

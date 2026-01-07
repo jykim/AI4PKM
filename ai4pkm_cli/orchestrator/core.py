@@ -156,6 +156,35 @@ class Orchestrator:
 
         logger.info("Orchestrator started successfully")
 
+        # Process any existing QUEUED tasks from previous run
+        self._load_queued_tasks_on_startup()
+
+    def _load_queued_tasks_on_startup(self):
+        """
+        Load and process existing QUEUED tasks on startup.
+
+        Scans the tasks directory for tasks with status=QUEUED and
+        processes them (up to max_concurrent limit).
+        """
+        from ..markdown_utils import read_frontmatter
+
+        try:
+            task_files = sorted(self.execution_manager.task_manager.tasks_dir.glob("*.md"))
+            queued_count = 0
+
+            for task_path in task_files:
+                fm = read_frontmatter(task_path)
+                if fm.get('status') == 'QUEUED':
+                    queued_count += 1
+
+            if queued_count > 0:
+                logger.info(f"Found {queued_count} QUEUED task(s) from previous run")
+                # Process queued tasks (will respect max_concurrent limit)
+                for _ in range(queued_count):
+                    self._process_queued_tasks()
+        except Exception as e:
+            logger.error(f"Error loading queued tasks on startup: {e}", exc_info=True)
+
     def stop(self):
         """Stop the orchestrator event loop."""
         if not self._running:
@@ -603,9 +632,10 @@ class Orchestrator:
                 if fm.get('status') != 'QUEUED':
                     continue
 
-                # Extract agent abbreviation, worker label, and trigger data
+                # Extract agent abbreviation, worker label, executor, and trigger data
                 agent_abbr = fm.get('task_type')
                 worker_label = fm.get('worker_label', '')
+                worker_executor = fm.get('worker')  # Executor stored in task file
                 trigger_data_json = fm.get('trigger_data_json')
 
                 if not agent_abbr:
@@ -646,6 +676,15 @@ class Orchestrator:
 
                     if worker_config:
                         agent = self._create_worker_agent_variant(base_agent, worker_config)
+                    elif worker_executor:
+                        # Worker config changed but task has stored executor - use it
+                        from dataclasses import replace
+                        logger.info(f"Worker '{worker_label}' not in current config, using stored executor '{worker_executor}'")
+                        agent = replace(
+                            base_agent,
+                            abbreviation=f"{agent_abbr}-{worker_label}",
+                            executor=worker_executor
+                        )
                     else:
                         logger.warning(f"Worker '{worker_label}' not found in agent '{agent_abbr}', using base agent")
                         agent = base_agent
