@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from .models import AgentDefinition, ExecutionContext
+from .web_executors import WebExecutor
 from ..logger import Logger
 
 if TYPE_CHECKING:
@@ -67,6 +68,9 @@ class ExecutionManager:
         
         # Load system prompt if it exists
         self.system_prompt = self._load_system_prompt()
+
+        # Web executor helper (initialized lazily to avoid circular import issues)
+        self._web_executor = None
 
     def can_execute(self, agent: AgentDefinition) -> bool:
         """
@@ -195,6 +199,10 @@ class ExecutionManager:
                 self._execute_continue_cli(agent, ctx, trigger_data)
             elif agent.executor == 'grok_cli':
                 self._execute_grok_cli(agent, ctx, trigger_data)
+            elif agent.executor == 'gemini_web':
+                self._get_web_executor().execute_gemini_web(agent, ctx, trigger_data)
+            elif agent.executor == 'chatgpt_web':
+                self._get_web_executor().execute_chatgpt_web(agent, ctx, trigger_data)
             else:
                 raise ValueError(f"Unknown executor: {agent.executor}")
 
@@ -302,6 +310,12 @@ class ExecutionManager:
 
         return ctx
 
+    def _get_web_executor(self) -> WebExecutor:
+        """Get or create the WebExecutor instance."""
+        if self._web_executor is None:
+            self._web_executor = WebExecutor(self.vault_path, self._build_prompt)
+        return self._web_executor
+
     def _execute_claude_code(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
         Execute agent using Claude Code CLI.
@@ -382,13 +396,7 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-
-        # GEMINI_API_KEY 환경변수가 있으면 전달 (Gemini CLI는 이 환경변수 사용)
-        env = None
-        if os.environ.get('GEMINI_API_KEY'):
-            env = os.environ.copy()
-
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
+        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -401,13 +409,7 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-
-        # OPENAI_API_KEY 환경변수가 있으면 전달
-        env = None
-        if os.environ.get('OPENAI_API_KEY'):
-            env = os.environ.copy()
-
-        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
+        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_cursor_agent(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
