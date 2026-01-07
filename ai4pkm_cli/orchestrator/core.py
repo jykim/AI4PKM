@@ -156,6 +156,35 @@ class Orchestrator:
 
         logger.info("Orchestrator started successfully")
 
+        # Process any existing QUEUED tasks from previous run
+        self._load_queued_tasks_on_startup()
+
+    def _load_queued_tasks_on_startup(self):
+        """
+        Load and process existing QUEUED tasks on startup.
+
+        Scans the tasks directory for tasks with status=QUEUED and
+        processes them (up to max_concurrent limit).
+        """
+        from ..markdown_utils import read_frontmatter
+
+        try:
+            task_files = sorted(self.execution_manager.task_manager.tasks_dir.glob("*.md"))
+            queued_count = 0
+
+            for task_path in task_files:
+                fm = read_frontmatter(task_path)
+                if fm.get('status') == 'QUEUED':
+                    queued_count += 1
+
+            if queued_count > 0:
+                logger.info(f"Found {queued_count} QUEUED task(s) from previous run")
+                # Process queued tasks (will respect max_concurrent limit)
+                for _ in range(queued_count):
+                    self._process_queued_tasks()
+        except Exception as e:
+            logger.error(f"Error loading queued tasks on startup: {e}", exc_info=True)
+
     def stop(self):
         """Stop the orchestrator event loop."""
         if not self._running:

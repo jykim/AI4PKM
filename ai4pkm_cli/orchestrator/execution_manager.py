@@ -382,7 +382,13 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
+
+        # GEMINI_API_KEY 환경변수가 있으면 전달 (Gemini CLI는 이 환경변수 사용)
+        env = None
+        if os.environ.get('GEMINI_API_KEY'):
+            env = os.environ.copy()
+
+        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -395,7 +401,13 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
+
+        # OPENAI_API_KEY 환경변수가 있으면 전달
+        env = None
+        if os.environ.get('OPENAI_API_KEY'):
+            env = os.environ.copy()
+
+        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
 
     def _execute_cursor_agent(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
@@ -502,7 +514,7 @@ class ExecutionManager:
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
         self._execute_subprocess(ctx, 'Grok CLI', ['grok'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
-    def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int, stdin_input: Optional[str] = None):
+    def _execute_subprocess(self, ctx: ExecutionContext, agent_name: str, cmd: List[str], timeout_seconds: int, stdin_input: Optional[str] = None, env: Optional[Dict] = None):
         # On Windows, resolve .cmd/.bat files to their full paths
         if platform.system() == 'Windows' and cmd:
             executable = cmd[0]
@@ -517,7 +529,7 @@ class ExecutionManager:
                 resolved_cmd = shutil.which(cmd_cmd)
                 if resolved_cmd:
                     cmd = [resolved_cmd] + cmd[1:]
-        
+
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -525,7 +537,8 @@ class ExecutionManager:
             stderr=subprocess.STDOUT,
             text=True,
             encoding='utf-8',
-            cwd=str(self.working_dir)
+            cwd=str(self.working_dir),
+            env=env
         )
 
         if ctx.task_file:
