@@ -632,9 +632,10 @@ class Orchestrator:
                 if fm.get('status') != 'QUEUED':
                     continue
 
-                # Extract agent abbreviation, worker label, and trigger data
+                # Extract agent abbreviation, worker label, executor, and trigger data
                 agent_abbr = fm.get('task_type')
                 worker_label = fm.get('worker_label', '')
+                worker_executor = fm.get('worker')  # Executor stored in task file
                 trigger_data_json = fm.get('trigger_data_json')
 
                 if not agent_abbr:
@@ -675,6 +676,15 @@ class Orchestrator:
 
                     if worker_config:
                         agent = self._create_worker_agent_variant(base_agent, worker_config)
+                    elif worker_executor:
+                        # Worker config changed but task has stored executor - use it
+                        from dataclasses import replace
+                        logger.info(f"Worker '{worker_label}' not in current config, using stored executor '{worker_executor}'")
+                        agent = replace(
+                            base_agent,
+                            abbreviation=f"{agent_abbr}-{worker_label}",
+                            executor=worker_executor
+                        )
                     else:
                         logger.warning(f"Worker '{worker_label}' not found in agent '{agent_abbr}', using base agent")
                         agent = base_agent
