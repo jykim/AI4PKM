@@ -6,6 +6,7 @@ execution for gemini_web and chatgpt_web executors.
 """
 import os
 import re
+import yaml
 from pathlib import Path
 from typing import Dict, Callable, List
 from datetime import datetime
@@ -233,10 +234,19 @@ class WebExecutor:
 
     def _write_output(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
-        Write web executor response to output file.
+        Write web executor response to output file using Template Injection.
 
-        For web executors (gemini_web, chatgpt_web), the API response is stored in ctx.response
-        but no file is created. This method writes the response to the configured output directory.
+        Template Injection ensures data quality by:
+        1. Extracting metadata from input file (guaranteed correct)
+        2. Extracting only body content from LLM response (stripping any frontmatter)
+        3. Building frontmatter from extracted metadata (LLM cannot influence)
+        4. Assembling final markdown file
+
+        This prevents common LLM output issues:
+        - Corrupted scenario_id (copied incorrectly)
+        - Missing frontmatter
+        - Junk text before frontmatter
+        - Wrong worker names
         """
         if not agent.output_path or not ctx.response:
             return
@@ -246,23 +256,127 @@ class WebExecutor:
 
         # Generate output filename from trigger file
         trigger_file = trigger_data.get('file_path', '')
+        worker_label = getattr(agent, 'worker_label', None) or agent.executor
+
         if trigger_file:
             trigger_stem = Path(trigger_file).stem
-            # Use worker label if available, otherwise use executor name
-            worker_label = getattr(agent, 'worker_label', None) or agent.executor
             output_filename = f"{trigger_stem} - {worker_label}.md"
         else:
-            # Fallback filename
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            worker_label = getattr(agent, 'worker_label', None) or agent.executor
             output_filename = f"{timestamp} - {worker_label}.md"
 
-        # Clean response: strip markdown code block wrapper if present
-        content = self._strip_markdown_code_block(ctx.response)
+        # === TEMPLATE INJECTION ===
+        # 1. Extract metadata from input file (guaranteed correct)
+        input_metadata = self._extract_input_metadata(trigger_data)
+
+        # 2. Extract body only from LLM response (strip any frontmatter/code blocks)
+        body = self._extract_body_only(ctx.response)
+
+        # 3. Build frontmatter (Orchestrator controls this - LLM cannot influence)
+        frontmatter = self._build_result_frontmatter(input_metadata, agent)
+
+        # 4. Assemble final content
+        content = self._assemble_markdown(frontmatter, body)
 
         output_path = output_dir / output_filename
         output_path.write_text(content, encoding='utf-8')
         logger.info(f"Web executor output written to: {output_path.relative_to(self.vault_path)}")
+
+    def _extract_input_metadata(self, trigger_data: Dict) -> Dict:
+        """
+        Extract frontmatter metadata from input file.
+
+        Returns:
+            Dict of frontmatter fields from input file, or empty dict if not found
+        """
+        input_path = trigger_data.get('path', '')
+        if not input_path:
+            return {}
+
+        input_file = self.vault_path / input_path
+        if not input_file.exists():
+            return {}
+
+        try:
+            content = input_file.read_text(encoding='utf-8')
+            if content.startswith('---'):
+                parts = content.split('---', 2)
+                if len(parts) >= 3:
+                    return yaml.safe_load(parts[1]) or {}
+        except Exception as e:
+            logger.warning(f"Could not parse input metadata from {input_path}: {e}")
+
+        return {}
+
+    def _extract_body_only(self, response: str) -> str:
+        """
+        Extract body content only, stripping any frontmatter or code blocks.
+
+        LLM sometimes generates frontmatter or wraps output in code blocks.
+        This method ensures we only get the actual content.
+
+        Args:
+            response: Raw LLM response
+
+        Returns:
+            Body content without frontmatter or code block wrappers
+        """
+        text = response.strip()
+
+        # Strip markdown code block wrapper if present
+        text = self._strip_markdown_code_block(text)
+
+        # Strip frontmatter if LLM generated one
+        if text.startswith('---'):
+            parts = text.split('---', 2)
+            if len(parts) >= 3:
+                text = parts[2].strip()
+
+        return text
+
+    def _build_result_frontmatter(self, input_metadata: Dict, agent: AgentDefinition) -> Dict:
+        """
+        Build frontmatter for result file.
+
+        This is the ONLY place where frontmatter is generated.
+        LLM output does not influence these values.
+
+        Args:
+            input_metadata: Metadata extracted from input file
+            agent: Agent definition with worker label
+
+        Returns:
+            Dict of frontmatter fields for output file
+        """
+        worker_label = getattr(agent, 'worker_label', None) or agent.executor
+
+        frontmatter = {}
+
+        # Copy from input (guaranteed correct - no LLM involvement)
+        copy_fields = ['scenario_id', 'query', 'query_type', 'domain']
+        for field in copy_fields:
+            if field in input_metadata:
+                frontmatter[field] = input_metadata[field]
+
+        # Add execution metadata (Orchestrator controls these)
+        frontmatter['task_worker'] = worker_label
+        frontmatter['created'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        return frontmatter
+
+    def _assemble_markdown(self, frontmatter: Dict, body: str) -> str:
+        """
+        Assemble final markdown with frontmatter and body.
+
+        Args:
+            frontmatter: Dict of frontmatter fields
+            body: Body content
+
+        Returns:
+            Complete markdown string with frontmatter
+        """
+        fm_str = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False)
+        return f"---\n{fm_str}---\n\n{body}"
 
     def _strip_markdown_code_block(self, text: str) -> str:
         """
