@@ -33,6 +33,7 @@ class Orchestrator:
         max_concurrent: Optional[int] = None,
         poll_interval: Optional[float] = None,
         config: Optional['Config'] = None,
+        mcp_config: Optional[tuple] = None,
     ):
         """
         Initialize orchestrator.
@@ -44,13 +45,14 @@ class Orchestrator:
             max_concurrent: Maximum concurrent task executions (defaults to config)
             poll_interval: Seconds between event queue polls (defaults to config)
             config: Config instance (will create default if None)
-            debug: Enable debug logging to console
+            mcp_config: Optional tuple of MCP config JSON files or strings
         """
         from ..config import Config
         from datetime import datetime
 
         self.vault_path = Path(vault_path)
         self.config = config or Config()
+        self.mcp_config = mcp_config
 
         # Use config values if not explicitly provided
         if agents_dir is None:
@@ -72,7 +74,8 @@ class Orchestrator:
             self.max_concurrent,
             self.config,
             orchestrator_settings=self.agent_registry.orchestrator_settings,
-            working_dir=working_dir
+            working_dir=working_dir,
+            mcp_config=mcp_config
         )
         self.file_monitor = FileSystemMonitor(self.vault_path, self.agent_registry)
 

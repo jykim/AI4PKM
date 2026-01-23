@@ -10,12 +10,13 @@ from ..orchestrator.core import Orchestrator
 
 logger = Logger(console_output=True)
 
-def trigger_orchestrator_agent(abbreviation=None, working_dir=None):
+def trigger_orchestrator_agent(abbreviation=None, working_dir=None, mcp_config=None):
     """Trigger an orchestrator agent or poller interactively.
     
     Args:
         abbreviation: Optional agent abbreviation or poller name to skip selection UX
         working_dir: Optional working directory for agent subprocess execution (defaults to vault_path)
+        mcp_config: Optional tuple of MCP config JSON files or strings
     """
     try:
         config = Config()
@@ -24,7 +25,8 @@ def trigger_orchestrator_agent(abbreviation=None, working_dir=None):
         orch = Orchestrator(
             vault_path=Path.cwd(),
             config=config,
-            working_dir=Path(working_dir) if working_dir else None
+            working_dir=Path(working_dir) if working_dir else None,
+            mcp_config=mcp_config
         )
 
         agents_list = [agent for agent in orch.agent_registry.agents.values()]

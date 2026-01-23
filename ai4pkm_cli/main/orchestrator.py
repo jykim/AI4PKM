@@ -12,7 +12,7 @@ from ..logger import Logger
 logger = Logger(console_output=True)
 
 
-def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None):
+def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None, mcp_config: tuple = None):
     """
     Run orchestrator in daemon mode.
 
@@ -21,6 +21,7 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
         debug: Enable debug logging to console
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
         config_file: Path to orchestrator config file (defaults to orchestrator.yaml in working directory)
+        mcp_config: Optional tuple of MCP config JSON files or strings
     """
     from ..config import Config
 
@@ -43,7 +44,8 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
         vault_path=vault_path,
         max_concurrent=max_concurrent,
         config=config,
-        working_dir=Path(working_dir) if working_dir else None
+        working_dir=Path(working_dir) if working_dir else None,
+        mcp_config=mcp_config
     )
 
     # Setup signal handlers
@@ -146,7 +148,8 @@ def execute_prompt_with_session(
     session_id: str = None,
     vault_path: Path = None,
     working_dir: str = None,
-    config_file: Path = None
+    config_file: Path = None,
+    mcp_config: tuple = None
 ):
     """
     Execute a one-time prompt with Claude agent and optional session ID.
@@ -162,6 +165,7 @@ def execute_prompt_with_session(
         vault_path: Path to vault root (defaults to CWD)
         working_dir: Working directory for agent subprocess execution (defaults to vault_path)
         config_file: Path to orchestrator config file (defaults to orchestrator.yaml in working directory)
+        mcp_config: Optional tuple of MCP config JSON files or strings
     """
     from ..config import Config
     import time
@@ -180,7 +184,8 @@ def execute_prompt_with_session(
     orch = Orchestrator(
         vault_path=vault_path,
         config=config,
-        working_dir=Path(working_dir) if working_dir else None
+        working_dir=Path(working_dir) if working_dir else None,
+        mcp_config=mcp_config
     )
     
     # Execute prompt
