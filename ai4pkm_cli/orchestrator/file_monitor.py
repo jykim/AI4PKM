@@ -26,7 +26,8 @@ class FileSystemMonitor:
     This prevents multiple triggers for the same file modification.
     """
 
-    def __init__(self, vault_path: Path, agent_registry=None, debounce_interval: float = 0.5):
+    def __init__(self, vault_path: Path, agent_registry=None, debounce_interval: float = 0.5,
+                 file_extensions: list = None):
         """
         Initialize file system monitor.
 
@@ -34,6 +35,7 @@ class FileSystemMonitor:
             vault_path: Path to vault root
             agent_registry: AgentRegistry instance (optional, for future use)
             debounce_interval: Seconds to wait after last event before processing (default: 0.5)
+            file_extensions: List of file extensions to monitor (default: ['.md'])
         """
         self.vault_path = Path(vault_path)
         self.agent_registry = agent_registry
@@ -41,6 +43,7 @@ class FileSystemMonitor:
         self.event_queue = Queue()
         self._running = False
         self.debounce_interval = debounce_interval
+        self.file_extensions = file_extensions or ['.md']
         
         # Debouncing state: (path, event_type) -> (event_data, timer)
         self._pending_events: Dict[Tuple[str, str], Tuple[dict, Optional[threading.Timer]]] = {}
@@ -48,11 +51,11 @@ class FileSystemMonitor:
 
     def start(self):
         """Start monitoring file system."""
-        event_handler = _FileEventHandler(self, self.vault_path, self.debounce_interval)
+        event_handler = _FileEventHandler(self, self.vault_path, self.debounce_interval, self.file_extensions)
         self.observer.schedule(event_handler, str(self.vault_path), recursive=True)
         self.observer.start()
         self._running = True
-        logger.info(f"File system monitoring started on {self.vault_path} (debounce: {self.debounce_interval}s)")
+        logger.info(f"File system monitoring started on {self.vault_path} (debounce: {self.debounce_interval}s, extensions: {self.file_extensions})")
 
     def stop(self):
         """Stop monitoring file system."""
@@ -149,10 +152,15 @@ class FileSystemMonitor:
 class _FileEventHandler(FileSystemEventHandler):
     """Internal handler for watchdog file events."""
 
-    def __init__(self, file_monitor: 'FileSystemMonitor', vault_path: Path, debounce_interval: float):
+    def __init__(self, file_monitor: 'FileSystemMonitor', vault_path: Path, debounce_interval: float, file_extensions: list):
         self.file_monitor = file_monitor
         self.vault_path = vault_path
         self.debounce_interval = debounce_interval
+        self.file_extensions = file_extensions
+
+    def _matches_extension(self, path: str) -> bool:
+        """Check if path matches any configured file extension."""
+        return any(path.lower().endswith(ext.lower()) for ext in self.file_extensions)
 
     def on_created(self, event: FileSystemEvent):
         """Handle file creation events."""
@@ -167,7 +175,7 @@ class _FileEventHandler(FileSystemEventHandler):
         # Check if this is orchestrator.yaml (special handling for hot-reload)
         if str(relative_path) == "orchestrator.yaml":
             self._debounce_reload_event(event)
-        elif not event.is_directory and event.src_path.endswith('.md'):
+        elif not event.is_directory and self._matches_extension(event.src_path):
             self._debounce_file_event(event, 'created')
 
     def on_modified(self, event: FileSystemEvent):
@@ -183,17 +191,17 @@ class _FileEventHandler(FileSystemEventHandler):
         # Check if this is orchestrator.yaml (special handling for hot-reload)
         if str(relative_path) == "orchestrator.yaml":
             self._debounce_reload_event(event)
-        elif not event.is_directory and event.src_path.endswith('.md'):
+        elif not event.is_directory and self._matches_extension(event.src_path):
             self._debounce_file_event(event, 'modified')
 
     def on_deleted(self, event: FileSystemEvent):
         """Handle file deletion events."""
-        if not event.is_directory and event.src_path.endswith('.md'):
+        if not event.is_directory and self._matches_extension(event.src_path):
             self._debounce_file_event(event, 'deleted')
 
     def on_moved(self, event: FileSystemEvent):
         """Handle file move/rename events (e.g., atomic writes)."""
-        if not event.is_directory and event.dest_path.endswith('.md'):
+        if not event.is_directory and self._matches_extension(event.dest_path):
             # Treat destination of move as a creation event
             # This handles atomic writes (temp file -> final file)
             self._debounce_file_event_for_moved(event, 'created')
