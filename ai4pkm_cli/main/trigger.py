@@ -20,5 +20,6 @@ def trigger_cli(ctx, agent):
         ai4pkm trigger EIC    # trigger EIC agent directly
     """
     working_dir = ctx.obj.get("working_dir") if ctx.obj else None
-    trigger_orchestrator_agent(abbreviation=agent, working_dir=working_dir)
+    mcp_config = ctx.obj.get("mcp_config") if ctx.obj else None
+    trigger_orchestrator_agent(abbreviation=agent, working_dir=working_dir, mcp_config=mcp_config)
 

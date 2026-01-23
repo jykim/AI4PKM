@@ -170,7 +170,7 @@ class StreamParser:
         return False
 
 
-def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True) -> list:
+def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True, mcp_config: tuple = None) -> list:
     """Build Claude CLI command with appropriate flags."""
     cmd = [
         'claude',
@@ -198,6 +198,11 @@ def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None
             cmd.extend(['--resume', session_id])
         else:
             cmd.extend(['--session-id', session_id])
+    
+    # Add MCP config(s) if provided
+    if mcp_config:
+        for config in mcp_config:
+            cmd.extend(['--mcp-config', config])
     
     return cmd
 
@@ -371,7 +376,7 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     return False
 
 
-def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None):
+def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, mcp_config: tuple = None):
     """
     Run interactive mode with Claude Code CLI.
     
@@ -385,6 +390,7 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
         append_system_prompt: Optional additional system prompt to append
         append_system_prompt_file: Optional path to file containing additional system prompt to append
         session_id: Optional session ID to resume or create
+        mcp_config: Optional tuple of MCP config JSON files or strings
     """
     cwd = Path(working_dir) if working_dir else Path.cwd()
     parser = StreamParser()
@@ -394,7 +400,7 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
     if session_id:
         use_resume = _session_exists(session_id, cwd)
     
-    cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume)
+    cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume, mcp_config=mcp_config)
     
     try:
         process = _spawn_claude_process(cmd, cwd)
