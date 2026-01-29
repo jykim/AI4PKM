@@ -316,7 +316,7 @@ class TaskFileManager:
         frontmatter_data = {
             'title': title,
             'created': created_time,
-            'archived': str(agent.task_archived).lower(),
+            'archived': agent.task_archived,
             'worker': agent.executor,
             'status': initial_status,
             'priority': agent.task_priority,

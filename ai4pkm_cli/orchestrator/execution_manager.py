@@ -334,7 +334,11 @@ class ExecutionManager:
         
         # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
-        
+
+        # Add model if specified in agent_params
+        if agent.agent_params and 'model' in agent.agent_params:
+            cmd.extend(['--model', agent.agent_params['model']])
+
         if ctx.system_prompt_file:
             cmd.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
         
@@ -369,6 +373,9 @@ class ExecutionManager:
                 # Clear previous error
                 ctx.error_message = None
                 cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
+                # Add model to resume command as well
+                if agent.agent_params and 'model' in agent.agent_params:
+                    cmd_resume.extend(['--model', agent.agent_params['model']])
                 if ctx.system_prompt_file:
                     cmd_resume.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
                 # Add system prompt to resume command
@@ -396,7 +403,14 @@ class ExecutionManager:
         """
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
+
+        cmd = ['gemini', '--yolo']
+
+        # Add model if specified in agent_params
+        if agent.agent_params and 'model' in agent.agent_params:
+            cmd.extend(['--model', agent.agent_params['model']])
+
+        self._execute_subprocess(ctx, 'Gemini CLI', cmd, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
