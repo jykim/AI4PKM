@@ -120,7 +120,7 @@ def main(
     session_id,
     interactive,
 ):
-    """PKM CLI - Personal Knowledge Management framework."""
+    """Evaluation CLI - AI-based Evaluation Framework."""
     # Set up signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
 

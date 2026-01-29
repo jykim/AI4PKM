@@ -127,7 +127,7 @@ def list_templates():
         click.echo(f"    Repository:  https://github.com/{info['repo']}")
         click.echo()
     
-    click.echo("Use 'ai4pkm template install <name> <target_dir>' to install.")
+    click.echo("Use 'ai4eval template install <name> <target_dir>' to install.")
 
 
 @template_group.command("install")

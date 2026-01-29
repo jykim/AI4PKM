@@ -119,7 +119,7 @@ def install_package(package_dir: Path) -> bool:
 def update_cli(force: bool, target_version: Optional[str], list_releases: bool) -> None:
     """Self-update the AI4PKM CLI from GitHub releases."""
     click.echo("=" * 50)
-    click.echo("AI4PKM CLI Self-Update")
+    click.echo("AI4Eval CLI Self-Update")
     click.echo("=" * 50)
     click.echo()
     

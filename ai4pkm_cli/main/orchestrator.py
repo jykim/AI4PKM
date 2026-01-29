@@ -32,7 +32,7 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
 
     debug_mode = "[yellow](DEBUG)[/yellow]" if debug else ""
     logger.info(Panel.fit(
-        f"[bold cyan]AI4PKM Orchestrator[/bold cyan] {debug_mode}\n"
+        f"[bold cyan]AI4Eval Orchestrator[/bold cyan] {debug_mode}\n"
         f"Vault: {vault_path}\n"
         f"Max concurrent: {max_concurrent}",
         title="Starting"

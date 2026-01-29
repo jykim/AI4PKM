@@ -47,7 +47,7 @@ class Logger:
 
             # Create date-based log filename with ai4pkm prefix
             date_str = datetime.now().strftime("%Y-%m-%d")
-            log_file = os.path.join(logs_dir, f"ai4pkm_{date_str}.log")
+            log_file = os.path.join(logs_dir, f"ai4eval_{date_str}.log")
 
         self.log_file = log_file
         self.lock = Lock()
