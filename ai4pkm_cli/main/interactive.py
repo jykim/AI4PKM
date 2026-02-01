@@ -264,8 +264,9 @@ def _encode_project_path(path: str) -> str:
             elif ch.isascii():
                 out.append('-')
             else:
-                # Non-ASCII: one dash per UTF-8 byte
-                out.append('-' * len(ch.encode('utf-8')))
+                # Non-ASCII: each Unicode character → single dash
+                # (Claude CLI treats each code point as 1 char, not based on UTF-8 bytes)
+                out.append('-')
         return ''.join(out)
 
     # Normalize to NFC (composed form) - macOS often uses NFD which has more chars
