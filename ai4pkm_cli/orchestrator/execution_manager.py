@@ -416,12 +416,31 @@ class ExecutionManager:
         """
         Execute agent using Codex CLI.
 
+        If OPENAI_API_KEY is available in environment, authenticates via API key first.
+
         Args:
             agent: Agent definition
             ctx: Execution context
             trigger_data: Trigger event data
         """
-        # Build prompt
+        # Authenticate with API key if available
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            try:
+                login_proc = subprocess.run(
+                    ['codex', 'login', '--with-api-key'],
+                    input=api_key,
+                    text=True,
+                    capture_output=True,
+                    cwd=str(self.working_dir),
+                    timeout=30
+                )
+                if login_proc.returncode != 0:
+                    logger.warning(f"Codex login failed: {login_proc.stderr}")
+            except Exception as e:
+                logger.warning(f"Codex login error: {e}")
+
+        # Build prompt and execute
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
         self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
