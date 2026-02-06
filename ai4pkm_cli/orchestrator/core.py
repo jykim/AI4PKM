@@ -77,7 +77,9 @@ class Orchestrator:
             working_dir=working_dir,
             mcp_config=mcp_config
         )
-        self.file_monitor = FileSystemMonitor(self.vault_path, self.agent_registry)
+        # Get file_extensions from orchestrator_settings (default to ['.md'] if not specified)
+        file_extensions = self.agent_registry.orchestrator_settings.get('file_extensions', ['.md'])
+        self.file_monitor = FileSystemMonitor(self.vault_path, self.agent_registry, file_extensions=file_extensions)
 
         # Initialize cron scheduler
         from .cron_scheduler import CronScheduler

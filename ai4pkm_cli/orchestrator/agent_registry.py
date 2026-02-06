@@ -405,8 +405,12 @@ class AgentRegistry:
 
             # Use custom input_pattern if specified
             if input_pattern:
-                # Extract file extensions if provided
-                trigger_pattern = f"{first_path}/{input_pattern}"
+                # Handle | separated patterns - add path prefix to each
+                if '|' in input_pattern:
+                    patterns = [f"{first_path}/{p.strip()}" for p in input_pattern.split('|')]
+                    trigger_pattern = '|'.join(patterns)
+                else:
+                    trigger_pattern = f"{first_path}/{input_pattern}"
             else:
                 # Default to *.md for text files
                 trigger_pattern = f"{first_path}/*.md"
@@ -473,8 +477,9 @@ class AgentRegistry:
         if agent.trigger_event != event_type:
             return False
 
-        # Check pattern matches
-        if not fnmatch.fnmatch(event_path, agent.trigger_pattern):
+        # Check pattern matches (supports | separated patterns)
+        trigger_patterns = agent.trigger_pattern.split('|')
+        if not any(fnmatch.fnmatch(event_path, p.strip()) for p in trigger_patterns):
             return False
 
         # Check exclusion pattern if specified
