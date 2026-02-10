@@ -4,6 +4,7 @@ import os
 import time
 import logging
 import threading
+from pathlib import Path
 from datetime import datetime
 from threading import Lock
 from rich.console import Console
@@ -30,17 +31,38 @@ class Logger:
                     instance._initialized = False
         return cls._instances[key]
 
+    @staticmethod
+    def _read_logs_dir_from_config():
+        """Read logs directory from orchestrator.yaml without importing Config.
+
+        Returns the configured ``orchestrator.logs_dir`` value, or the default
+        ``_Settings_/Logs`` when the file is missing or unparseable.
+        """
+        default = os.path.join("_Settings_", "Logs")
+        try:
+            import yaml
+            config_path = Path(os.getcwd()) / "orchestrator.yaml"
+            if config_path.exists():
+                with config_path.open("r", encoding="utf-8") as fh:
+                    data = yaml.safe_load(fh) or {}
+                if isinstance(data, dict):
+                    orch = data.get("orchestrator", {})
+                    if isinstance(orch, dict):
+                        return orch.get("logs_dir", default)
+        except Exception:
+            pass
+        return default
+
     def __init__(self, log_file=None, console_output=False):
         """Initialize logger (only once per instance)."""
         if self._initialized:
             return
-            
+
         if log_file is None:
-            # Use current working directory as project root
             project_root = os.getcwd()
 
-            # Create logs directory path
-            logs_dir = os.path.join(project_root, "_Settings_", "Logs")
+            # Read logs directory from config instead of hard-coding
+            logs_dir = os.path.join(project_root, self._read_logs_dir_from_config())
 
             # Ensure logs directory exists
             os.makedirs(logs_dir, exist_ok=True)
@@ -68,7 +90,6 @@ class Logger:
             with open(self.log_file, 'w', encoding='utf-8') as f:
                 f.write(f"PKM CLI Log - Started at {datetime.now().isoformat()}\n")
                 f.write("=" * 60 + "\n")
-
 
     def _write_log(self, level, message, exc_info=False, console=False):
         """Write log entry to file and optionally to console."""
