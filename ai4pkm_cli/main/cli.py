@@ -108,6 +108,12 @@ def signal_handler(sig, frame):
     multiple=True,
     help="Load MCP servers from JSON files or strings (can be specified multiple times)",
 )
+@click.option(
+    "--claude-settings",
+    "claude_settings",
+    type=str,
+    help="Path to a settings JSON file or a JSON string for Claude Code (passed as --settings to claude CLI)",
+)
 @click.pass_context
 def main(
     ctx,
@@ -126,6 +132,7 @@ def main(
     session_id,
     interactive,
     mcp_config,
+    claude_settings,
 ):
     """PKM CLI - Personal Knowledge Management framework."""
     # Set up signal handler for graceful shutdown
@@ -142,6 +149,7 @@ def main(
     ctx.obj["config_file"] = config_file
     ctx.obj["debug"] = debug
     ctx.obj["mcp_config"] = mcp_config
+    ctx.obj["claude_settings"] = claude_settings
 
     # If a subcommand was invoked, let it handle execution
     if ctx.invoked_subcommand is not None:
@@ -149,11 +157,11 @@ def main(
 
     # Handle legacy flag-based commands
     if interactive:
-        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id, mcp_config=mcp_config)
+        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id, mcp_config=mcp_config, claude_settings=claude_settings)
     elif orchestrator_status:
         show_orchestrator_status(working_dir=working_dir, config_file=config_file)
     elif orchestrator:
-        run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file, mcp_config=mcp_config)
+        run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file, mcp_config=mcp_config, claude_settings=claude_settings)
     elif prompt_text:
         execute_prompt_with_session(
             prompt=prompt_text,
@@ -164,7 +172,8 @@ def main(
             system_prompt_file=system_prompt_file,
             append_system_prompt=append_system_prompt,
             append_system_prompt_file=append_system_prompt_file,
-            mcp_config=mcp_config
+            mcp_config=mcp_config,
+            claude_settings=claude_settings
         )
     elif list_agents:
         list_agents_handler()
