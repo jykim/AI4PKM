@@ -30,7 +30,7 @@ class ExecutionManager:
     Each agent can specify max_parallel limit.
     """
 
-    def __init__(self, vault_path: Path, max_concurrent: int = 3, config: Optional['Config'] = None, orchestrator_settings: Optional[dict] = None, working_dir: Optional[Path] = None, mcp_config: Optional[tuple] = None):
+    def __init__(self, vault_path: Path, max_concurrent: int = 3, config: Optional['Config'] = None, orchestrator_settings: Optional[dict] = None, working_dir: Optional[Path] = None, mcp_config: Optional[tuple] = None, claude_settings: Optional[str] = None):
         """
         Initialize execution manager.
 
@@ -41,6 +41,7 @@ class ExecutionManager:
             orchestrator_settings: Orchestrator settings from YAML (optional)
             working_dir: Working directory for agent subprocess execution (defaults to vault_path)
             mcp_config: Optional tuple of MCP config JSON files or strings
+            claude_settings: Optional path or JSON string for Claude --settings flag
         """
         from ..config import Config
 
@@ -50,6 +51,7 @@ class ExecutionManager:
         self.config = config or Config()
         self.orchestrator_settings = orchestrator_settings or {}
         self.mcp_config = mcp_config
+        self.claude_settings = claude_settings
 
         # Instance-level state (no global state)
         self._running_count = 0
@@ -342,7 +344,11 @@ class ExecutionManager:
         if self.mcp_config:
             for config in self.mcp_config:
                 cmd.extend(['--mcp-config', config])
-        
+
+        # Add Claude settings if provided
+        if self.claude_settings:
+            cmd.extend(['--settings', self.claude_settings])
+
         # Add session ID handling: try to create new first, resume if already exists
         if ctx.session_id:
             # First try to create new session with --session-id
@@ -377,6 +383,9 @@ class ExecutionManager:
                 if self.mcp_config:
                     for config in self.mcp_config:
                         cmd_resume.extend(['--mcp-config', config])
+                # Add Claude settings to resume command
+                if self.claude_settings:
+                    cmd_resume.extend(['--settings', self.claude_settings])
                 self._execute_subprocess(ctx, 'Claude CLI', cmd_resume, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
             else:
                 # Re-raise if it's a different error

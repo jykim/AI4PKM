@@ -170,7 +170,7 @@ class StreamParser:
         return False
 
 
-def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True, mcp_config: tuple = None) -> list:
+def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, use_resume: bool = True, mcp_config: tuple = None, claude_settings: str = None) -> list:
     """Build Claude CLI command with appropriate flags."""
     cmd = [
         'claude',
@@ -203,7 +203,11 @@ def _build_claude_cmd(system_prompt: str = None, system_prompt_file: Path = None
     if mcp_config:
         for config in mcp_config:
             cmd.extend(['--mcp-config', config])
-    
+
+    # Add Claude settings if provided
+    if claude_settings:
+        cmd.extend(['--settings', claude_settings])
+
     return cmd
 
 
@@ -377,7 +381,7 @@ def _session_exists(session_id: str, cwd: Path) -> bool:
     return False
 
 
-def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, mcp_config: tuple = None):
+def run_interactive_mode(working_dir: str = None, system_prompt: str = None, system_prompt_file: Path = None, append_system_prompt: str = None, append_system_prompt_file: Path = None, session_id: str = None, mcp_config: tuple = None, claude_settings: str = None):
     """
     Run interactive mode with Claude Code CLI.
     
@@ -401,7 +405,7 @@ def run_interactive_mode(working_dir: str = None, system_prompt: str = None, sys
     if session_id:
         use_resume = _session_exists(session_id, cwd)
     
-    cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume, mcp_config=mcp_config)
+    cmd = _build_claude_cmd(system_prompt, system_prompt_file, append_system_prompt, append_system_prompt_file, session_id, use_resume=use_resume, mcp_config=mcp_config, claude_settings=claude_settings)
     
     try:
         process = _spawn_claude_process(cmd, cwd)

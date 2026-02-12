@@ -12,7 +12,7 @@ from ..logger import Logger
 logger = Logger(console_output=True)
 
 
-def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None, mcp_config: tuple = None):
+def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None, mcp_config: tuple = None, claude_settings: str = None):
     """
     Run orchestrator in daemon mode.
 
@@ -45,7 +45,8 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
         max_concurrent=max_concurrent,
         config=config,
         working_dir=Path(working_dir) if working_dir else None,
-        mcp_config=mcp_config
+        mcp_config=mcp_config,
+        claude_settings=claude_settings
     )
 
     # Setup signal handlers
@@ -149,7 +150,8 @@ def execute_prompt_with_session(
     vault_path: Path = None,
     working_dir: str = None,
     config_file: Path = None,
-    mcp_config: tuple = None
+    mcp_config: tuple = None,
+    claude_settings: str = None
 ):
     """
     Execute a one-time prompt with Claude agent and optional session ID.
@@ -185,7 +187,8 @@ def execute_prompt_with_session(
         vault_path=vault_path,
         config=config,
         working_dir=Path(working_dir) if working_dir else None,
-        mcp_config=mcp_config
+        mcp_config=mcp_config,
+        claude_settings=claude_settings
     )
     
     # Execute prompt

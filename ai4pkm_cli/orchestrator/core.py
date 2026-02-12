@@ -34,6 +34,7 @@ class Orchestrator:
         poll_interval: Optional[float] = None,
         config: Optional['Config'] = None,
         mcp_config: Optional[tuple] = None,
+        claude_settings: Optional[str] = None,
     ):
         """
         Initialize orchestrator.
@@ -46,6 +47,7 @@ class Orchestrator:
             poll_interval: Seconds between event queue polls (defaults to config)
             config: Config instance (will create default if None)
             mcp_config: Optional tuple of MCP config JSON files or strings
+            claude_settings: Optional path or JSON string for Claude --settings flag
         """
         from ..config import Config
         from datetime import datetime
@@ -53,6 +55,7 @@ class Orchestrator:
         self.vault_path = Path(vault_path)
         self.config = config or Config()
         self.mcp_config = mcp_config
+        self.claude_settings = claude_settings
 
         # Use config values if not explicitly provided
         if agents_dir is None:
@@ -75,7 +78,8 @@ class Orchestrator:
             self.config,
             orchestrator_settings=self.agent_registry.orchestrator_settings,
             working_dir=working_dir,
-            mcp_config=mcp_config
+            mcp_config=mcp_config,
+            claude_settings=claude_settings
         )
         # Get file_extensions from orchestrator_settings (default to ['.md'] if not specified)
         file_extensions = self.agent_registry.orchestrator_settings.get('file_extensions', ['.md'])
