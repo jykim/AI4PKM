@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai4pkm-cli"
-version = "0.1.15"
+version = "0.1.17"
 description = "Personal Knowledge Management CLI framework"
 authors = [{name = "AI4PKM Team"}]
 readme = "README.md"
