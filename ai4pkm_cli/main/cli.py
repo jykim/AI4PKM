@@ -10,7 +10,6 @@ from pathlib import Path
 from .list_agents import list_agents as list_agents_handler
 from .show_config import show_config as show_config_handler
 from .orchestrator import run_orchestrator_daemon, show_orchestrator_status, execute_prompt_with_session
-from .interactive import run_interactive_mode
 from .update import update_cli
 from .template import template_group
 from .trigger import trigger_cli
@@ -96,13 +95,6 @@ def signal_handler(sig, frame):
     help="Session ID - automatically resumes if exists, creates if not",
 )
 @click.option(
-    "-i",
-    "--interactive",
-    "interactive",
-    is_flag=True,
-    help="Launch interactive mode with Claude Code (streaming JSON I/O)",
-)
-@click.option(
     "--mcp-config",
     "mcp_config",
     multiple=True,
@@ -130,7 +122,6 @@ def main(
     append_system_prompt_file,
     prompt_text,
     session_id,
-    interactive,
     mcp_config,
     claude_settings,
 ):
@@ -156,9 +147,7 @@ def main(
         return
 
     # Handle legacy flag-based commands
-    if interactive:
-        run_interactive_mode(working_dir=working_dir, system_prompt=system_prompt, system_prompt_file=system_prompt_file, append_system_prompt=append_system_prompt, append_system_prompt_file=append_system_prompt_file, session_id=session_id, mcp_config=mcp_config, claude_settings=claude_settings)
-    elif orchestrator_status:
+    if orchestrator_status:
         show_orchestrator_status(working_dir=working_dir, config_file=config_file)
     elif orchestrator:
         run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file, mcp_config=mcp_config, claude_settings=claude_settings)
