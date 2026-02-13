@@ -14,8 +14,14 @@ from .trigger_agent import trigger_orchestrator_agent
     multiple=True,
     help="Load MCP servers from JSON files or strings (can be specified multiple times)",
 )
+@click.option(
+    "--claude-settings",
+    "claude_settings",
+    type=str,
+    help="Path to a settings JSON file or a JSON string for Claude Code (passed as --settings to claude CLI)",
+)
 @click.pass_context
-def trigger_cli(ctx, agent, mcp_config):
+def trigger_cli(ctx, agent, mcp_config, claude_settings):
     """Trigger an orchestrator agent.
     
     If AGENT abbreviation is provided, triggers that agent directly.
@@ -29,5 +35,7 @@ def trigger_cli(ctx, agent, mcp_config):
     # Merge mcp_config from parent context and local option
     parent_mcp_config = ctx.obj.get("mcp_config") if ctx.obj else ()
     combined_mcp_config = parent_mcp_config + mcp_config if mcp_config else parent_mcp_config
-    trigger_orchestrator_agent(abbreviation=agent, working_dir=working_dir, mcp_config=combined_mcp_config)
+    # Use local --claude-settings if provided, otherwise fall back to parent context
+    effective_claude_settings = claude_settings or (ctx.obj.get("claude_settings") if ctx.obj else None)
+    trigger_orchestrator_agent(abbreviation=agent, working_dir=working_dir, mcp_config=combined_mcp_config, claude_settings=effective_claude_settings)
 
