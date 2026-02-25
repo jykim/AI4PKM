@@ -32,7 +32,6 @@ class AgentDefinition:
     trigger_content_pattern: Optional[str] = None  # Regex pattern to match in file content
     trigger_schedule: Optional[str] = None
     trigger_wait_for: List[str] = field(default_factory=list)
-    trigger_cooldown: int = 0  # Minimum seconds between triggers for same agent
 
     # Input/output
     input_path: List[str] = field(default_factory=list)

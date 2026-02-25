@@ -59,7 +59,6 @@ class AgentRegistry:
         self.vault_path = Path(vault_path)
         self.config = config or Config()
         self.agents: Dict[str, AgentDefinition] = {}
-        self._agent_last_trigger: Dict[str, datetime] = {}  # Per-agent cooldown tracking
 
         # Use orchestrator config from Config instance (respects --config-file CLI option)
         self.orchestrator_config = self.config.config
@@ -341,7 +340,6 @@ class AgentRegistry:
             trigger_content_pattern=node.get('trigger_content_pattern'),
             trigger_schedule=node.get('trigger_schedule'),
             trigger_wait_for=trigger_wait_for,
-            trigger_cooldown=int(node.get('trigger_cooldown', defaults.get('trigger_cooldown', 0))),
             cron=cron,
             input_path=input_path,
             input_type=input_type,
@@ -501,15 +499,6 @@ class AgentRegistry:
             if self._has_existing_task(event_path):
                 logger.debug(f"Skipping {event_path} - task already exists")
                 return False
-
-        # Check per-agent cooldown
-        if agent.trigger_cooldown > 0:
-            now = datetime.now()
-            last_trigger = self._agent_last_trigger.get(agent.abbreviation)
-            if last_trigger and (now - last_trigger).total_seconds() < agent.trigger_cooldown:
-                logger.debug(f"Skipping {agent.abbreviation}: cooldown ({agent.trigger_cooldown}s)")
-                return False
-            self._agent_last_trigger[agent.abbreviation] = now
 
         return True
 
