@@ -800,18 +800,31 @@ class ExecutionManager:
             if not output_dir.exists():
                 output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Look for markdown files created/modified after execution started
+            # Look for output files created/modified after execution started
             start_time = ctx.start_time.timestamp() - 5 if ctx.start_time else 0
             input_filename = Path(input_path_str).stem if input_path_str else ''
 
+            # Determine expected extensions from output_naming
+            output_extensions = ['.md']  # default
+            if agent.output_naming:
+                ext = Path(agent.output_naming).suffix
+                if ext and ext != '.md':
+                    output_extensions.append(ext)
+
+            # Also support common non-md output types when no specific naming set
+            if not agent.output_naming or '{' in agent.output_naming:
+                output_extensions.extend(['.canvas', '.json'])
+
             recent_files = []
-            for md_file in output_dir.glob("*.md"):
-                if md_file.stat().st_mtime >= start_time:
-                    # Prioritize files with matching input filename
-                    if input_filename and input_filename in md_file.stem:
-                        recent_files.insert(0, md_file)
-                    else:
-                        recent_files.append(md_file)
+            for ext in set(output_extensions):
+                pattern = f"*{ext}"
+                for out_file in output_dir.glob(pattern):
+                    if out_file.stat().st_mtime >= start_time:
+                        # Prioritize files with matching input filename
+                        if input_filename and input_filename in out_file.stem:
+                            recent_files.insert(0, out_file)
+                        else:
+                            recent_files.append(out_file)
 
             if recent_files:
                 # Use the most relevant file (first in list)
