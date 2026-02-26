@@ -308,6 +308,8 @@ class AgentRegistry:
         task_create = node.get('task_create', defaults.get('task_create', True))
         task_priority = node.get('task_priority', defaults.get('task_priority', 'medium'))
         task_archived = node.get('task_archived', defaults.get('task_archived', False))
+        retry = node.get('retry', defaults.get('retry', False))
+        retry_max = int(node.get('retry_max', defaults.get('retry_max', 20)))
 
         # Infer output_optional: if no input_path, output is optional
         # This means scheduled/manual agents can complete without producing output
@@ -356,6 +358,8 @@ class AgentRegistry:
             log_prefix=node.get('log_prefix', agent_id),
             log_pattern=node.get('log_pattern', '{timestamp}-{agent}.log'),
             post_process_action=node.get('post_process_action'),
+            retry=retry,
+            retry_max=retry_max,
             task_create=task_create,
             task_priority=task_priority,
             task_archived=task_archived,

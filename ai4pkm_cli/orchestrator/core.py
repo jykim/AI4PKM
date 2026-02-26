@@ -581,7 +581,10 @@ class Orchestrator:
 
     def _execute_agent(self, agent, event_data, slot_reserved=False):
         """
-        Execute an agent task.
+        Execute an agent task, with optional file-change retry.
+
+        If agent.retry is True, checks whether the input file was modified
+        during execution and re-executes automatically (up to agent.retry_max times).
 
         Args:
             agent: AgentDefinition to execute
@@ -591,33 +594,94 @@ class Orchestrator:
         Returns:
             ExecutionContext if execution completed, None on error
         """
-        try:
-            # Extract session_id from event_data
-            session_id = event_data.get('session_id')
-            if not session_id and 'frontmatter' in event_data:
-                session_id = event_data['frontmatter'].get('session_id')
-            
-            ctx = self.execution_manager.execute(
-                agent, event_data, 
-                slot_reserved=slot_reserved, 
-                session_id=session_id,
-                resume_session=False  # Auto-detect in _execute_claude_code
+        retry_count = 0
+        task_file = None
+
+        while True:
+            # Record input file mtime before execution
+            input_mtime_before = None
+            if agent.retry:
+                input_path = event_data.get('path', '')
+                if input_path:
+                    full_path = self.vault_path / input_path
+                    if full_path.exists():
+                        input_mtime_before = full_path.stat().st_mtime
+
+            try:
+                # Inject existing task file for retries
+                if task_file and retry_count > 0:
+                    event_data['_existing_task_file'] = str(task_file)
+
+                # Extract session_id from event_data
+                session_id = event_data.get('session_id')
+                if not session_id and 'frontmatter' in event_data:
+                    session_id = event_data['frontmatter'].get('session_id')
+
+                ctx = self.execution_manager.execute(
+                    agent, event_data,
+                    slot_reserved=slot_reserved,
+                    session_id=session_id,
+                    resume_session=False  # Auto-detect in _execute_claude_code
+                )
+                slot_reserved = False  # execute() releases slot in finally
+
+                # Save task file reference from first execution
+                if not task_file and ctx.task_file:
+                    task_file = ctx.task_file
+
+                if ctx.success:
+                    logger.info(f"{agent.abbreviation} completed ({ctx.duration:.1f}s)")
+                else:
+                    duration_str = f"{ctx.duration:.1f}s" if ctx.duration else "unknown"
+                    error_msg = f"{agent.abbreviation} failed: {ctx.status} ({duration_str})"
+                    if ctx.error_message:
+                        error_msg += f" - {ctx.error_message}"
+                    logger.error(error_msg)
+                    break  # Don't retry on failure
+
+            except Exception as e:
+                logger.error(f"{agent.abbreviation} error: {e}", exc_info=True)
+                return None
+
+            # --- Retry check ---
+            if not agent.retry or input_mtime_before is None:
+                break
+
+            # Check if input file was modified during execution
+            input_path = event_data.get('path', '')
+            if not input_path:
+                break
+            full_path = self.vault_path / input_path
+            if not full_path.exists():
+                break  # File gone, don't retry
+
+            input_mtime_after = full_path.stat().st_mtime
+            if input_mtime_after <= input_mtime_before:
+                break  # File not modified, done
+
+            # File was modified → retry
+            retry_count += 1
+            if agent.retry_max > 0 and retry_count >= agent.retry_max:
+                logger.warning(
+                    f"{agent.abbreviation}: retry limit reached ({retry_count})"
+                )
+                break
+
+            logger.info(
+                f"{agent.abbreviation}: input file modified during execution, "
+                f"re-executing ({retry_count}/{agent.retry_max})"
             )
 
-            if ctx.success:
-                logger.info(f"{agent.abbreviation} completed ({ctx.duration:.1f}s)")
-            else:
-                duration_str = f"{ctx.duration:.1f}s" if ctx.duration else "unknown"
-                error_msg = f"{agent.abbreviation} failed: {ctx.status} ({duration_str})"
-                if ctx.error_message:
-                    error_msg += f" - {ctx.error_message}"
-                logger.error(error_msg)
+            # Reserve slot for retry
+            if not self.execution_manager.reserve_slot(agent):
+                logger.warning(
+                    f"{agent.abbreviation}: no slot available for retry, queueing"
+                )
+                self._create_queued_task(agent, event_data)
+                break
+            slot_reserved = True
 
-            return ctx
-
-        except Exception as e:
-            logger.error(f"{agent.abbreviation} error: {e}", exc_info=True)
-            return None
+        return ctx
 
     def _process_queued_tasks(self):
         """
