@@ -122,7 +122,7 @@ class ApplePhotosPoller(BasePoller):
 
                 processed_basenames.add(basename_no_ext)
 
-                files = glob.glob(f"{self.destination_folder_path}*{basename_no_ext}.*")
+                files = glob.glob(os.path.join(str(self.destination_folder_path), f"*{basename_no_ext}.*"))
                 if files:
                     skipped_count += 1
                     continue
@@ -142,19 +142,26 @@ class ApplePhotosPoller(BasePoller):
                         [script_path, file, str(self.destination_folder_path)],
                         capture_output=True, text=True, check=True
                     )
-                    
-                    processed_count += 1
-                    logger.info(f"Successfully processed: {basename}")
-                    
+
                     script_output = result.stdout.strip() if result.stdout else ""
+                    if "Skipping:" in script_output:
+                        skipped_count += 1
+                        logger.info(f"Already processed: {basename}")
+                    else:
+                        processed_count += 1
+                        logger.info(f"Successfully processed: {basename}")
+
                     if script_output:
                         for line in script_output.split('\n'):
                             if line.strip():
-                                logger.debug(f"Shell script: {line.strip()}")
+                                logger.debug(f"process_photo.sh: {line.strip()}")
                                 
                 except subprocess.CalledProcessError as e:
                     logger.error(f"Failed to process {basename}: {e}")
-                    logger.error(f"Error output: {e.stderr}")
+                    if e.stderr:
+                        logger.error(f"Error output: {e.stderr.strip()}")
+                    if e.stdout:
+                        logger.error(f"Script output: {e.stdout.strip()}")
                     continue
 
             logger.info(
