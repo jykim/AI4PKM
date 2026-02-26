@@ -29,14 +29,17 @@ input_ext="${input_basename##*.}"
 input_ext_upper="$(printf '%s' "$input_ext" | tr '[:lower:]' '[:upper:]')"
 
 if [[ ! -f "$input_file" ]]; then
+    echo "Error: Input file not found: $input_file" >&2
     exit 1
 fi
 
 if ! command -v exiftool &> /dev/null; then
+    echo "Error: exiftool is not installed. Install with: brew install exiftool" >&2
     exit 1
 fi
 
 if ! command -v sips &> /dev/null; then
+    echo "Error: sips is not available" >&2
     exit 1
 fi
 
