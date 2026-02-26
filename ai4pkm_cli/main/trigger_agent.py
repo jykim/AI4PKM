@@ -10,17 +10,18 @@ from ..orchestrator.core import Orchestrator
 
 logger = Logger(console_output=True)
 
-def trigger_orchestrator_agent(abbreviation=None, working_dir=None, mcp_config=None, claude_settings=None):
+def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=None, mcp_config=None, claude_settings=None):
     """Trigger an orchestrator agent or poller interactively.
 
     Args:
         abbreviation: Optional agent abbreviation or poller name to skip selection UX
+        config_file: Optional path to orchestrator config file
         working_dir: Optional working directory for agent subprocess execution (defaults to vault_path)
         mcp_config: Optional tuple of MCP config JSON files or strings
         claude_settings: Optional path or JSON string for Claude --settings flag
     """
     try:
-        config = Config()
+        config = Config(config_file=config_file)
 
         # Create orchestrator (but don't start daemon)
         orch = Orchestrator(

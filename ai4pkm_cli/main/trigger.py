@@ -9,6 +9,13 @@ from .trigger_agent import trigger_orchestrator_agent
 @click.command("trigger")
 @click.argument("agent", required=False, default=None)
 @click.option(
+    "-c",
+    "--config-file",
+    "config_file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    help="Path to orchestrator config file (default: orchestrator.yaml in working directory)",
+)
+@click.option(
     "--mcp-config",
     "mcp_config",
     multiple=True,
@@ -21,7 +28,7 @@ from .trigger_agent import trigger_orchestrator_agent
     help="Path to a settings JSON file or a JSON string for Claude Code (passed as --settings to claude CLI)",
 )
 @click.pass_context
-def trigger_cli(ctx, agent, mcp_config, claude_settings):
+def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings):
     """Trigger an orchestrator agent.
     
     If AGENT abbreviation is provided, triggers that agent directly.
@@ -32,10 +39,12 @@ def trigger_cli(ctx, agent, mcp_config, claude_settings):
         ai4pkm trigger EIC    # trigger EIC agent directly
     """
     working_dir = ctx.obj.get("working_dir") if ctx.obj else None
+    # Use local --config-file if provided, otherwise fall back to parent context
+    effective_config_file = config_file or (ctx.obj.get("config_file") if ctx.obj else None)
     # Merge mcp_config from parent context and local option
     parent_mcp_config = ctx.obj.get("mcp_config") if ctx.obj else ()
     combined_mcp_config = parent_mcp_config + mcp_config if mcp_config else parent_mcp_config
     # Use local --claude-settings if provided, otherwise fall back to parent context
     effective_claude_settings = claude_settings or (ctx.obj.get("claude_settings") if ctx.obj else None)
-    trigger_orchestrator_agent(abbreviation=agent, working_dir=working_dir, mcp_config=combined_mcp_config, claude_settings=effective_claude_settings)
+    trigger_orchestrator_agent(abbreviation=agent, config_file=effective_config_file, working_dir=working_dir, mcp_config=combined_mcp_config, claude_settings=effective_claude_settings)
 
