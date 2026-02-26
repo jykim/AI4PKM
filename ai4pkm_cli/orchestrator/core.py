@@ -598,15 +598,6 @@ class Orchestrator:
         task_file = None
 
         while True:
-            # Record input file mtime before execution
-            input_mtime_before = None
-            if agent.retry:
-                input_path = event_data.get('path', '')
-                if input_path:
-                    full_path = self.vault_path / input_path
-                    if full_path.exists():
-                        input_mtime_before = full_path.stat().st_mtime
-
             try:
                 # Inject existing task file for retries
                 if task_file and retry_count > 0:
@@ -644,22 +635,26 @@ class Orchestrator:
                 return None
 
             # --- Retry check ---
-            if not agent.retry or input_mtime_before is None:
+            if not agent.retry:
                 break
 
-            # Check if input file was modified during execution
             input_path = event_data.get('path', '')
             if not input_path:
                 break
             full_path = self.vault_path / input_path
             if not full_path.exists():
-                break  # File gone, don't retry
+                break
 
-            input_mtime_after = full_path.stat().st_mtime
-            if input_mtime_after <= input_mtime_before:
-                break  # File not modified, done
+            # Watch for post-exit file changes
+            mtime_at_exit = full_path.stat().st_mtime
+            watch_seconds = getattr(agent, 'retry_watch_seconds', 5)
+            time.sleep(watch_seconds)
+            mtime_post_window = full_path.stat().st_mtime
 
-            # File was modified → retry
+            if mtime_post_window <= mtime_at_exit:
+                break  # No changes after exit, done
+
+            # File was modified after exit → retry
             retry_count += 1
             if agent.retry_max > 0 and retry_count >= agent.retry_max:
                 logger.warning(
@@ -668,7 +663,7 @@ class Orchestrator:
                 break
 
             logger.info(
-                f"{agent.abbreviation}: input file modified during execution, "
+                f"{agent.abbreviation}: input file modified after exit, "
                 f"re-executing ({retry_count}/{agent.retry_max})"
             )
 
