@@ -38,7 +38,7 @@ def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings, input_file
     Examples:
         ai4pkm trigger        # interactive selector
         ai4pkm trigger EIC    # trigger EIC agent directly
-        ai4pkm trigger SRPC-CAP --file Eval/Pilot_SRPCompare/Queries/query_01.md
+        ai4pkm trigger EIC --file Eval/Pilot_SRPCompare/Queries/query_01.md
     """
     working_dir = ctx.obj.get("working_dir") if ctx.obj else None
     # Use local --config-file if provided, otherwise fall back to parent context
