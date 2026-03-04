@@ -37,7 +37,6 @@ def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings, input_file
 
     Examples:
         ai4pkm trigger        # interactive selector
-        ai4pkm trigger EIC    # trigger EIC agent directly
         ai4pkm trigger EIC --file Ingest/Clipping/what_is_pkm.md
     """
     working_dir = ctx.obj.get("working_dir") if ctx.obj else None
