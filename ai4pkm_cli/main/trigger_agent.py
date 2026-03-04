@@ -10,7 +10,7 @@ from ..orchestrator.core import Orchestrator
 
 logger = Logger(console_output=True)
 
-def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=None, mcp_config=None, claude_settings=None):
+def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=None, mcp_config=None, claude_settings=None, input_file=None):
     """Trigger an orchestrator agent or poller interactively.
 
     Args:
@@ -19,6 +19,7 @@ def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=
         working_dir: Optional working directory for agent subprocess execution (defaults to vault_path)
         mcp_config: Optional tuple of MCP config JSON files or strings
         claude_settings: Optional path or JSON string for Claude --settings flag
+        input_file: Optional input file path to pass to the agent
     """
     try:
         config = Config(config_file=config_file)
@@ -162,7 +163,7 @@ def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=
             if selected_agent:
                 # Trigger agent
                 logger.info(f"Triggering agent: {selected_agent.abbreviation}")
-                ctx = orch.trigger_agent_once(selected_agent.abbreviation)
+                ctx = orch.trigger_agent_once(selected_agent.abbreviation, input_file=input_file)
 
                 end_time = time.time()
                 execution_time = end_time - start_time

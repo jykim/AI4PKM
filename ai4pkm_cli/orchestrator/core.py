@@ -1027,13 +1027,14 @@ class Orchestrator:
             ]
         }
 
-    def trigger_agent_once(self, agent_abbreviation: str, session_id: Optional[str] = None) -> Optional[ExecutionContext]:
+    def trigger_agent_once(self, agent_abbreviation: str, session_id: Optional[str] = None, input_file: Optional[str] = None) -> Optional[ExecutionContext]:
         """
         Manually trigger an agent once (synchronously).
 
         Args:
             agent_abbreviation: Agent abbreviation (e.g., "GDR", "EIC")
             session_id: Optional session ID for tracking related executions
+            input_file: Optional input file path to pass to the agent
 
         Returns:
             ExecutionContext if agent was found and executed, None otherwise
@@ -1048,14 +1049,34 @@ class Orchestrator:
 
         logger.info(f"Manually triggering agent: {agent.abbreviation} ({agent.name})")
 
-        # Create synthetic TriggerEvent for manual execution
-        trigger_event = TriggerEvent(
-            path="",  # No file path for manual triggers
-            event_type="manual",
-            is_directory=False,
-            timestamp=datetime.now(),
-            frontmatter={}
-        )
+        # Create TriggerEvent - use input_file if provided, otherwise manual trigger
+        if input_file:
+            from ..markdown_utils import read_frontmatter
+            file_path = Path(input_file)
+            # Resolve to absolute path if relative
+            if not file_path.is_absolute():
+                file_path = self.vault_path / file_path
+            # Get relative path from vault root
+            try:
+                relative_path = str(file_path.relative_to(self.vault_path))
+            except ValueError:
+                relative_path = str(file_path)
+            fm = read_frontmatter(file_path) if file_path.exists() else {}
+            trigger_event = TriggerEvent(
+                path=relative_path,
+                event_type="created",
+                is_directory=False,
+                timestamp=datetime.now(),
+                frontmatter=fm
+            )
+        else:
+            trigger_event = TriggerEvent(
+                path="",  # No file path for manual triggers
+                event_type="manual",
+                is_directory=False,
+                timestamp=datetime.now(),
+                frontmatter={}
+            )
 
         # Convert to event data dict
         event_data = {
@@ -1067,10 +1088,31 @@ class Orchestrator:
             'session_id': session_id  # Add session_id to event_data
         }
 
-        # Execute synchronously via _execute_agent
+        # Execute synchronously
         try:
-            ctx = self._execute_agent(agent, event_data, slot_reserved=False)
-            return ctx
+            if agent.workers:
+                # Multi-worker: execute each worker sequentially
+                input_filename = Path(trigger_event.path).name if trigger_event.path else "manual"
+                logger.info(f"Multi-worker agent: {agent.abbreviation} ({input_filename}) with {len(agent.workers)} workers", console=True)
+                last_ctx = None
+                all_success = True
+                for worker in agent.workers:
+                    worker_agent = self._create_worker_agent_variant(agent, worker)
+                    logger.info(f"Running worker: {worker_agent.abbreviation}", console=True)
+                    ctx = self._execute_agent(worker_agent, event_data, slot_reserved=False)
+                    if ctx:
+                        last_ctx = ctx
+                        if not ctx.success:
+                            all_success = False
+                            logger.error(f"Worker {worker_agent.abbreviation} failed: {ctx.error_message}", console=True)
+                    else:
+                        all_success = False
+                if last_ctx and all_success:
+                    last_ctx.success = True
+                return last_ctx
+            else:
+                ctx = self._execute_agent(agent, event_data, slot_reserved=False)
+                return ctx
         except Exception as e:
             logger.error(f"Error executing agent {agent_abbreviation}: {e}", exc_info=True)
             return None
