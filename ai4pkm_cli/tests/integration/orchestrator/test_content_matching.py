@@ -268,3 +268,266 @@ Content %% #AI %%
 
             matches = registry.find_matching_agents(event_data)
             assert len(matches) == 1, f"Failed to match: {marker}"
+
+
+class TestFrontmatterCondition:
+    """Test frontmatter condition-based triggering."""
+
+    @pytest.fixture
+    def temp_vault(self):
+        """Create temporary vault structure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_path = Path(tmpdir)
+            (vault_path / "_Settings_" / "Agents").mkdir(parents=True)
+            (vault_path / "AI" / "Tasks" / "Logs").mkdir(parents=True)
+            (vault_path / "Inbox").mkdir(parents=True)
+            yield vault_path
+
+    def _create_agent_file(self, vault_path, abbr="FMT", category="ingestion"):
+        """Create a minimal agent prompt file with *(ABBR).md naming convention."""
+        agent_file = vault_path / "_Settings_" / "Agents" / f"Test Agent ({abbr}).md"
+        agent_file.write_text(f"""---
+title: Frontmatter Test Agent
+abbreviation: {abbr}
+category: {category}
+---
+
+# Test prompt
+""", encoding='utf-8')
+        return agent_file
+
+    def _make_registry(self, vault_path, node_overrides=None):
+        """Create AgentRegistry with a single agent node."""
+        self._create_agent_file(vault_path)
+        node = {
+            'type': 'agent',
+            'name': 'Frontmatter Test Agent (FMT)',
+            'prompt': 'FMT',
+            'input_path': ['Inbox'],
+            'trigger_event': 'created',
+        }
+        if node_overrides:
+            node.update(node_overrides)
+
+        from ai4pkm_cli.config import Config
+        config = Config.__new__(Config)
+        config.config = {'nodes': [node], 'defaults': {}}
+        config.vault_path = vault_path
+        config._orchestrator_tasks_dir = 'AI/Tasks'
+
+        return AgentRegistry(
+            agents_dir=vault_path / "_Settings_" / "Agents",
+            vault_path=vault_path,
+            config=config,
+        )
+
+    def test_not_null_triggers_when_field_exists(self, temp_vault):
+        """Field != null triggers when field exists and has value."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'action items != null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'action items': ['item1', 'item2']},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_not_null_no_trigger_when_field_missing(self, temp_vault):
+        """Field != null does NOT trigger when field is absent."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'action items != null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'title': 'Hello'},
+        }
+        assert len(registry.find_matching_agents(event)) == 0
+
+    def test_not_null_no_trigger_when_field_is_none(self, temp_vault):
+        """Field != null does NOT trigger when field value is None."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'action items != null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'action items': None},
+        }
+        assert len(registry.find_matching_agents(event)) == 0
+
+    def test_eq_null_triggers_when_missing(self, temp_vault):
+        """Field == null triggers when field is missing."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'processed == null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'title': 'Hello'},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_eq_null_no_trigger_when_field_present(self, temp_vault):
+        """Field == null does NOT trigger when field exists."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'processed == null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'processed': True},
+        }
+        assert len(registry.find_matching_agents(event)) == 0
+
+    def test_equality(self, temp_vault):
+        """status == draft triggers on matching value."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'status == draft',
+        })
+        match_event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'status': 'draft'},
+        }
+        no_match_event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'status': 'published'},
+        }
+        assert len(registry.find_matching_agents(match_event)) == 1
+        assert len(registry.find_matching_agents(no_match_event)) == 0
+
+    def test_inequality(self, temp_vault):
+        """status != done triggers when value differs."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'status != done',
+        })
+        triggers = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'status': 'draft'},
+        }
+        no_trigger = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'status': 'done'},
+        }
+        assert len(registry.find_matching_agents(triggers)) == 1
+        assert len(registry.find_matching_agents(no_trigger)) == 0
+
+    def test_contains_list(self, temp_vault):
+        """tags contains ai triggers when list contains value."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'tags contains ai',
+        })
+        match_event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'tags': ['ai', 'notes']},
+        }
+        no_match = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'tags': ['notes', 'work']},
+        }
+        assert len(registry.find_matching_agents(match_event)) == 1
+        assert len(registry.find_matching_agents(no_match)) == 0
+
+    def test_contains_string(self, temp_vault):
+        """contains works on string fields too."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'title contains Draft',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'title': 'Draft of my article'},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_matches_regex(self, temp_vault):
+        """matches operator tests regex against field value."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'title matches ^Draft',
+        })
+        match_event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'title': 'Draft: my article'},
+        }
+        no_match = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'title': 'My Draft article'},
+        }
+        assert len(registry.find_matching_agents(match_event)) == 1
+        assert len(registry.find_matching_agents(no_match)) == 0
+
+    def test_multiple_conditions_and_logic(self, temp_vault):
+        """Multiple conditions must all pass (AND)."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': [
+                'action items != null',
+                'status == draft',
+            ],
+        })
+        both_match = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'action items': ['a'], 'status': 'draft'},
+        }
+        only_one = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'action items': ['a'], 'status': 'published'},
+        }
+        assert len(registry.find_matching_agents(both_match)) == 1
+        assert len(registry.find_matching_agents(only_one)) == 0
+
+    def test_field_with_spaces(self, temp_vault):
+        """Fields with spaces in names work correctly."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'action items != null',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'action items': ['task1']},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_nested_dot_notation(self, temp_vault):
+        """Dot notation accesses nested frontmatter fields."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'metadata.status == draft',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {'metadata': {'status': 'draft'}},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_no_condition_always_matches(self, temp_vault):
+        """Agent without frontmatter condition matches regardless of frontmatter."""
+        registry = self._make_registry(temp_vault)
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
+
+    def test_inequality_missing_field_triggers(self, temp_vault):
+        """!= on a missing field should return True (missing != any value)."""
+        registry = self._make_registry(temp_vault, {
+            'trigger_frontmatter_condition': 'status != done',
+        })
+        event = {
+            'path': 'Inbox/test.md',
+            'event_type': 'created',
+            'frontmatter': {},
+        }
+        assert len(registry.find_matching_agents(event)) == 1
