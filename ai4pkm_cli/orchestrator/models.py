@@ -30,7 +30,6 @@ class AgentDefinition:
     trigger_event: str
     trigger_exclude_pattern: Optional[str] = None
     trigger_content_pattern: Optional[str] = None  # Regex pattern to match in file content
-    trigger_frontmatter_condition: Optional[List[str]] = None  # Frontmatter field conditions (AND logic)
     trigger_schedule: Optional[str] = None
     trigger_wait_for: List[str] = field(default_factory=list)
 

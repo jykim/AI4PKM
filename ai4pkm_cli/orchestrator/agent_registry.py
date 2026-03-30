@@ -18,9 +18,6 @@ from ..logger import Logger
 
 logger = Logger()
 
-# Sentinel for missing frontmatter fields (distinct from None)
-_MISSING = object()
-
 
 # JSON Schema for agent definition validation
 AGENT_SCHEMA = {
@@ -301,12 +298,6 @@ class AgentRegistry:
         if isinstance(trigger_wait_for, str):
             trigger_wait_for = [trigger_wait_for]
 
-        trigger_frontmatter_condition = node.get('trigger_frontmatter_condition')
-        if trigger_frontmatter_condition is None:
-            trigger_frontmatter_condition = None
-        elif isinstance(trigger_frontmatter_condition, str):
-            trigger_frontmatter_condition = [trigger_frontmatter_condition]
-
         # Extract cron expression from node config
         cron = node.get('cron')
 
@@ -347,7 +338,6 @@ class AgentRegistry:
             trigger_event=trigger_event,
             trigger_exclude_pattern=node.get('trigger_exclude_pattern'),
             trigger_content_pattern=node.get('trigger_content_pattern'),
-            trigger_frontmatter_condition=trigger_frontmatter_condition,
             trigger_schedule=node.get('trigger_schedule'),
             trigger_wait_for=trigger_wait_for,
             cron=cron,
@@ -442,15 +432,14 @@ class AgentRegistry:
         matching = []
         event_path = event_data.get('path', '')
         event_type = event_data.get('event_type', '')
-        frontmatter = event_data.get('frontmatter', {})
-
+        
         for agent in self.agents.values():
-            if self._matches_trigger(agent, event_path, event_type, frontmatter):
+            if self._matches_trigger(agent, event_path, event_type):
                 matching.append(agent)
 
         return matching
 
-    def _matches_trigger(self, agent: AgentDefinition, event_path: str, event_type: str, frontmatter: Optional[dict] = None) -> bool:
+    def _matches_trigger(self, agent: AgentDefinition, event_path: str, event_type: str) -> bool:
         """
         Check if event matches agent's trigger conditions.
 
@@ -458,7 +447,6 @@ class AgentRegistry:
             agent: AgentDefinition to check
             event_path: File path from event (may be empty for scheduled events)
             event_type: Event type (created, modified, deleted, scheduled)
-            frontmatter: Frontmatter dict from the triggering file
 
         Returns:
             True if event matches agent's trigger
@@ -512,15 +500,6 @@ class AgentRegistry:
                 logger.debug(f"Skipping {event_path} - task already exists")
                 return False
 
-        # Check frontmatter condition if specified
-        if agent.trigger_frontmatter_condition:
-            fm = frontmatter or {}
-            result = self._check_frontmatter_condition(fm, agent.trigger_frontmatter_condition)
-            logger.debug(f"[{agent.abbreviation}] Frontmatter condition {agent.trigger_frontmatter_condition} "
-                         f"against keys={list(fm.keys())} → {result}")
-            if not result:
-                return False
-
         return True
 
     def _check_content_pattern(self, event_path: str, pattern: str) -> bool:
@@ -548,127 +527,6 @@ class AgentRegistry:
         except Exception as e:
             logger.error(f"Error reading file {event_path}: {e}")
             return False
-
-    def _check_frontmatter_condition(self, frontmatter: dict, conditions: List[str]) -> bool:
-        """
-        Check if frontmatter satisfies all conditions (AND logic).
-
-        Args:
-            frontmatter: Frontmatter dict from file
-            conditions: List of condition expressions
-
-        Returns:
-            True if all conditions are satisfied
-        """
-        for condition in conditions:
-            if not self._evaluate_frontmatter_expr(frontmatter, condition):
-                return False
-        return True
-
-    def _get_frontmatter_value(self, frontmatter: dict, field_name: str):
-        """
-        Get a value from frontmatter, supporting dot notation for nested fields.
-
-        Args:
-            frontmatter: Frontmatter dict
-            field_name: Field name, possibly with dots for nesting
-
-        Returns:
-            The value, or _MISSING sentinel if not found
-        """
-        keys = field_name.split('.')
-        current = frontmatter
-        for key in keys:
-            if isinstance(current, dict) and key in current:
-                current = current[key]
-            else:
-                return _MISSING
-        return current
-
-    def _evaluate_frontmatter_expr(self, frontmatter: dict, expr: str) -> bool:
-        """
-        Evaluate a single frontmatter condition expression.
-
-        Supported operators: != null, == null, ==, !=, contains, matches
-
-        Args:
-            frontmatter: Frontmatter dict
-            expr: Expression string (e.g., "status == draft")
-
-        Returns:
-            True if condition is satisfied
-        """
-        expr = expr.strip()
-
-        # Handle "!= null" and "== null" (field name may contain spaces)
-        for op in ('!= null', '== null'):
-            if expr.endswith(op):
-                field_name = expr[:-len(op)].strip()
-                value = self._get_frontmatter_value(frontmatter, field_name)
-                if op == '!= null':
-                    return value is not _MISSING and value is not None and value != ''
-                else:  # == null
-                    return value is _MISSING or value is None or value == ''
-
-        # Try operators in order (longest first to avoid partial matches)
-        for op in ('contains', 'matches', '!=', '=='):
-            # For word operators, require space boundaries
-            if op in ('contains', 'matches'):
-                pattern = f' {op} '
-                idx = expr.find(pattern)
-                if idx == -1:
-                    continue
-                field_name = expr[:idx].strip()
-                rhs = expr[idx + len(pattern):].strip()
-            else:
-                idx = expr.find(op)
-                if idx == -1:
-                    continue
-                field_name = expr[:idx].strip()
-                rhs = expr[idx + len(op):].strip()
-
-            value = self._get_frontmatter_value(frontmatter, field_name)
-
-            if op == '==':
-                if value is _MISSING:
-                    logger.debug(f"Frontmatter field '{field_name}' missing → == returns False")
-                    return False
-                str_value = str(value)
-                # Case-insensitive comparison for boolean-like values
-                if rhs.lower() in ('true', 'false') and str_value.lower() in ('true', 'false'):
-                    result = str_value.lower() == rhs.lower()
-                else:
-                    result = str_value == rhs
-                logger.debug(f"Frontmatter '{field_name}' == '{rhs}': value={str_value!r} → {result}")
-                return result
-            elif op == '!=':
-                if value is _MISSING:
-                    logger.debug(f"Frontmatter field '{field_name}' missing → != returns True")
-                    return True
-                str_value = str(value)
-                if rhs.lower() in ('true', 'false') and str_value.lower() in ('true', 'false'):
-                    result = str_value.lower() != rhs.lower()
-                else:
-                    result = str_value != rhs
-                logger.debug(f"Frontmatter '{field_name}' != '{rhs}': value={str_value!r} → {result}")
-                return result
-            elif op == 'contains':
-                if value is _MISSING or value is None:
-                    return False
-                if isinstance(value, list):
-                    return rhs in [str(v) for v in value]
-                return rhs in str(value)
-            elif op == 'matches':
-                if value is _MISSING or value is None:
-                    return False
-                try:
-                    return bool(re.search(rhs, str(value)))
-                except re.error as e:
-                    logger.error(f"Invalid regex in frontmatter condition '{expr}': {e}")
-                    return False
-
-        logger.warning(f"Could not parse frontmatter condition: {expr}")
-        return False
 
     def _has_existing_task(self, event_path: str) -> bool:
         """
