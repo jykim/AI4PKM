@@ -3,6 +3,7 @@ Task file manager for orchestrator.
 
 Creates and updates task tracking files in _Tasks_/ directory.
 """
+import re
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -76,6 +77,8 @@ class TaskFileManager:
             # Get input file info
             input_file_path = ctx.trigger_data.get('path', 'unknown')
             input_file_name = Path(input_file_path).stem
+            # Strip Gobi sync conflict markers
+            input_file_name = re.sub(r'^\.!\d+!', '', input_file_name)
 
             # Get generation log link
             log_link = ""
@@ -305,6 +308,8 @@ class TaskFileManager:
         input_path = ctx.trigger_data.get('path', '')
         if input_path:
             input_name = Path(input_path).stem
+            # Strip Gobi sync conflict markers like .!79673! from filename
+            input_name = re.sub(r'^\.!\d+!', '', input_name)
         else:
             # For scheduled agents, use 'scheduled' with timestamp
             timestamp = ctx.start_time.strftime('%H%M') if ctx.start_time else datetime.now().strftime('%H%M')

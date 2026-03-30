@@ -22,6 +22,7 @@ def signal_handler(sig, frame):
 
 
 @click.group(invoke_without_command=True)
+@click.version_option(package_name="ai4pkm-cli")
 @click.option(
     "-o",
     "--orchestrator",

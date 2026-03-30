@@ -4,6 +4,7 @@ File system monitor for orchestrator.
 Monitors vault for file changes and queues events for processing.
 Uses debouncing to group rapid file changes and process them after a delay.
 """
+import re
 import threading
 from pathlib import Path
 from queue import Queue
@@ -158,6 +159,10 @@ class _FileEventHandler(FileSystemEventHandler):
         self.debounce_interval = debounce_interval
         self.file_extensions = file_extensions
 
+    def _is_sync_conflict(self, path: str) -> bool:
+        """Check if file is a Gobi sync conflict variant (e.g., .!79673!filename.md)."""
+        return bool(re.search(r'/\.!\d+!', path))
+
     def _matches_extension(self, path: str) -> bool:
         """Check if path matches any configured file extension."""
         return any(path.lower().endswith(ext.lower()) for ext in self.file_extensions)
@@ -175,7 +180,7 @@ class _FileEventHandler(FileSystemEventHandler):
         # Check if this is orchestrator.yaml (special handling for hot-reload)
         if str(relative_path) == "orchestrator.yaml":
             self._debounce_reload_event(event)
-        elif not event.is_directory and self._matches_extension(event.src_path):
+        elif not event.is_directory and self._matches_extension(event.src_path) and not self._is_sync_conflict(event.src_path):
             self._debounce_file_event(event, 'created')
 
     def on_modified(self, event: FileSystemEvent):
@@ -191,17 +196,17 @@ class _FileEventHandler(FileSystemEventHandler):
         # Check if this is orchestrator.yaml (special handling for hot-reload)
         if str(relative_path) == "orchestrator.yaml":
             self._debounce_reload_event(event)
-        elif not event.is_directory and self._matches_extension(event.src_path):
+        elif not event.is_directory and self._matches_extension(event.src_path) and not self._is_sync_conflict(event.src_path):
             self._debounce_file_event(event, 'modified')
 
     def on_deleted(self, event: FileSystemEvent):
         """Handle file deletion events."""
-        if not event.is_directory and self._matches_extension(event.src_path):
+        if not event.is_directory and self._matches_extension(event.src_path) and not self._is_sync_conflict(event.src_path):
             self._debounce_file_event(event, 'deleted')
 
     def on_moved(self, event: FileSystemEvent):
         """Handle file move/rename events (e.g., atomic writes)."""
-        if not event.is_directory and self._matches_extension(event.dest_path):
+        if not event.is_directory and self._matches_extension(event.dest_path) and not self._is_sync_conflict(event.dest_path):
             # Treat destination of move as a creation event
             # This handles atomic writes (temp file -> final file)
             self._debounce_file_event_for_moved(event, 'created')
