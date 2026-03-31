@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from .models import AgentDefinition, ExecutionContext
+from .web_executors import WebExecutor
 from ..logger import Logger
 
 if TYPE_CHECKING:
@@ -71,6 +72,9 @@ class ExecutionManager:
         
         # Load system prompt if it exists
         self.system_prompt = self._load_system_prompt()
+
+        # Web executor helper (initialized lazily to avoid circular import issues)
+        self._web_executor = None
 
     def can_execute(self, agent: AgentDefinition) -> bool:
         """
@@ -199,6 +203,10 @@ class ExecutionManager:
                 self._execute_continue_cli(agent, ctx, trigger_data)
             elif agent.executor == 'grok_cli':
                 self._execute_grok_cli(agent, ctx, trigger_data)
+            elif agent.executor == 'gemini_web':
+                self._get_web_executor().execute_gemini_web(agent, ctx, trigger_data)
+            elif agent.executor == 'chatgpt_web':
+                self._get_web_executor().execute_chatgpt_web(agent, ctx, trigger_data)
             else:
                 raise ValueError(f"Unknown executor: {agent.executor}")
 
@@ -306,6 +314,12 @@ class ExecutionManager:
 
         return ctx
 
+    def _get_web_executor(self) -> WebExecutor:
+        """Get or create the WebExecutor instance."""
+        if self._web_executor is None:
+            self._web_executor = WebExecutor(self.vault_path, self._build_prompt)
+        return self._web_executor
+
     def _execute_claude_code(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
         Execute agent using Claude Code CLI.
@@ -324,7 +338,11 @@ class ExecutionManager:
         
         # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
-        
+
+        # Add model if specified in agent_params
+        if agent.agent_params and 'model' in agent.agent_params:
+            cmd.extend(['--model', agent.agent_params['model']])
+
         if ctx.system_prompt_file:
             cmd.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
         
@@ -368,6 +386,9 @@ class ExecutionManager:
                 # Clear previous error
                 ctx.error_message = None
                 cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
+                # Add model to resume command as well
+                if agent.agent_params and 'model' in agent.agent_params:
+                    cmd_resume.extend(['--model', agent.agent_params['model']])
                 if ctx.system_prompt_file:
                     cmd_resume.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
                 # Add system prompt to resume command
@@ -403,31 +424,45 @@ class ExecutionManager:
         # Build prompt
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
 
-        # GEMINI_API_KEY 환경변수가 있으면 전달 (Gemini CLI는 이 환경변수 사용)
-        env = None
-        if os.environ.get('GEMINI_API_KEY'):
-            env = os.environ.copy()
+        cmd = ['gemini', '--yolo']
 
-        self._execute_subprocess(ctx, 'Gemini CLI', ['gemini', '--yolo'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
+        # Add model if specified in agent_params
+        if agent.agent_params and 'model' in agent.agent_params:
+            cmd.extend(['--model', agent.agent_params['model']])
+
+        self._execute_subprocess(ctx, 'Gemini CLI', cmd, agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_codex_cli(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """
         Execute agent using Codex CLI.
+
+        If OPENAI_API_KEY is available in environment, authenticates via API key first.
 
         Args:
             agent: Agent definition
             ctx: Execution context
             trigger_data: Trigger event data
         """
-        # Build prompt
+        # Authenticate with API key if available
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if api_key:
+            try:
+                login_proc = subprocess.run(
+                    ['codex', 'login', '--with-api-key'],
+                    input=api_key,
+                    text=True,
+                    capture_output=True,
+                    cwd=str(self.working_dir),
+                    timeout=30
+                )
+                if login_proc.returncode != 0:
+                    logger.warning(f"Codex login failed: {login_proc.stderr}")
+            except Exception as e:
+                logger.warning(f"Codex login error: {e}")
+
+        # Build prompt and execute
         ctx.prompt = self._build_prompt(agent, trigger_data, ctx)
-
-        # OPENAI_API_KEY 환경변수가 있으면 전달
-        env = None
-        if os.environ.get('OPENAI_API_KEY'):
-            env = os.environ.copy()
-
-        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt, env=env)
+        self._execute_subprocess(ctx, 'Codex CLI', ['codex', '--search', '--enable', 'web_search_request', 'exec', '--skip-git-repo-check', '--full-auto'], agent.timeout_minutes * 60, stdin_input=ctx.prompt)
 
     def _execute_cursor_agent(self, agent: AgentDefinition, ctx: ExecutionContext, trigger_data: Dict):
         """

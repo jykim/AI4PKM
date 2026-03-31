@@ -999,7 +999,8 @@ class Orchestrator:
             output_path=worker.output_path or base_agent.output_path,
             output_naming=output_naming,
             log_pattern='{timestamp}-{agent}.log',  # Agent abbr includes worker label
-            workers=[]  # Clear workers list to prevent recursion
+            workers=[],  # Clear workers list to prevent recursion
+            worker_label=worker.label  # Pass worker label for Template Injection
         )
 
     def get_status(self) -> dict:

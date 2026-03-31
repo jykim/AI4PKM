@@ -165,7 +165,7 @@ class TaskFileManager:
     ):
         """
         Update task file status and add trigger_data_json atomically.
-        
+
         Used when enriching QUEUED tasks with trigger data.
 
         Args:
@@ -181,64 +181,18 @@ class TaskFileManager:
             # Read current content
             content = task_path.read_text(encoding='utf-8')
 
-            # Update frontmatter - both status and trigger_data_json
-            from ..markdown_utils import update_frontmatter_fields, extract_frontmatter
-            
-            # Check if trigger_data_json already exists
-            frontmatter = extract_frontmatter(content)
-            updates = {'status': status}
-            
-            # Add trigger_data_json if not already present
-            if 'trigger_data_json' not in frontmatter:
-                # We need to add it manually since update_frontmatter_fields doesn't handle multi-line values well
-                # Find the end of frontmatter and insert trigger_data_json before closing ---
-                import re
-                import yaml
-                match = re.match(r'^(---\s*\n)(.*?)(\n---\s*\n)', content, re.DOTALL)
-                if match:
-                    prefix = match.group(1)
-                    yaml_content = match.group(2)
-                    suffix = match.group(3)
-                    rest = content[match.end():]
-                    
-                    # Use YAML's literal block scalar (|) to preserve JSON string without escaping issues
-                    # This handles special characters, quotes, and Unicode properly
-                    yaml_content += f'\ntrigger_data_json: |\n'
-                    # Indent each line of the JSON string
-                    for line in trigger_data_json.split('\n'):
-                        yaml_content += f'  {line}\n'
-                    
-                    content = prefix + yaml_content + suffix + rest
-                else:
-                    logger.warning(f"Could not parse frontmatter in {task_path.name}")
-            else:
-                # Update existing trigger_data_json - use literal block scalar
-                import re
-                # Match existing trigger_data_json (could be quoted string or literal block)
-                lines = content.split('\n')
-                new_lines = []
-                skip_indented = False
-                for line in lines:
-                    if skip_indented:
-                        # Skip indented lines (part of literal block or quoted string continuation)
-                        # Stop when we hit a non-indented line (new key or closing ---)
-                        if line and not line.startswith(' ') and not line.startswith('\t'):
-                            skip_indented = False
-                        else:
-                            continue  # Skip this indented line
-                    
-                    if re.match(r'^trigger_data_json:\s*', line):
-                        # Replace with new literal block format
-                        new_lines.append('trigger_data_json: |')
-                        # Add JSON content with proper indentation
-                        for json_line in trigger_data_json.split('\n'):
-                            new_lines.append(f'  {json_line}')
-                        skip_indented = True
-                    else:
-                        new_lines.append(line)
-                content = '\n'.join(new_lines)
+            # Update frontmatter using update_frontmatter_fields for all updates
+            from ..markdown_utils import update_frontmatter_fields
 
-            # Update status
+            # Escape backslashes in JSON string for YAML compatibility
+            escaped_json = trigger_data_json.replace('\\', '\\\\')
+
+            # Update both status and trigger_data_json in a single call
+            updates = {
+                'status': status,
+                'trigger_data_json': escaped_json
+            }
+
             content = update_frontmatter_fields(content, updates)
 
             # Write back with explicit flush and sync to ensure disk write
@@ -367,7 +321,7 @@ class TaskFileManager:
         frontmatter_data = {
             'title': title,
             'created': created_time,
-            'archived': str(agent.task_archived).lower(),
+            'archived': agent.task_archived,
             'worker': agent.executor,
             'status': initial_status,
             'priority': agent.task_priority,

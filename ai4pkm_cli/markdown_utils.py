@@ -104,18 +104,31 @@ def update_frontmatter_field(content: str, field: str, value: Any) -> str:
         
         return prefix + updated_yaml + suffix + rest
     except Exception as e:
-        # If ruamel fails, fall back to regex-based approach
-        field_pattern = rf'^{field}:\s*.*$'
-        if re.search(field_pattern, yaml_content, re.MULTILINE):
-            # Update existing field - escape quotes in value
-            escaped_value = str(value).replace('"', '\\"')
-            yaml_content = re.sub(field_pattern, f'{field}: "{escaped_value}"', yaml_content, flags=re.MULTILINE)
-        else:
-            # Add new field
-            escaped_value = str(value).replace('"', '\\"')
-            yaml_content += f'\n{field}: "{escaped_value}"'
-        
-        return prefix + yaml_content + suffix + rest
+        # Log the parsing failure
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"ruamel.yaml parse failed, using fallback: {e}")
+
+        # Fallback: use PyYAML safe_load which is more tolerant
+        try:
+            import yaml as pyyaml
+            data = pyyaml.safe_load(yaml_content) or {}
+            data[field] = value
+            updated_yaml = pyyaml.dump(data, default_flow_style=False, allow_unicode=True)
+            return prefix + updated_yaml + suffix + rest
+        except Exception:
+            # Last resort: regex-based update
+            field_pattern = rf'^{re.escape(field)}:\s*.*$'
+            if re.search(field_pattern, yaml_content, re.MULTILINE):
+                # Update existing field - escape quotes in value
+                escaped_value = str(value).replace('"', '\\"')
+                yaml_content = re.sub(field_pattern, f'{field}: "{escaped_value}"', yaml_content, flags=re.MULTILINE)
+            else:
+                # Add new field
+                escaped_value = str(value).replace('"', '\\"')
+                yaml_content += f'\n{field}: "{escaped_value}"'
+
+            return prefix + yaml_content + suffix + rest
 
 
 def update_frontmatter_fields(content: str, updates: Dict[str, Any]) -> str:
@@ -166,7 +179,12 @@ def update_frontmatter_fields(content: str, updates: Dict[str, Any]) -> str:
         
         return prefix + updated_yaml + suffix + rest
     except Exception as e:
-        # Fallback: update fields one by one using regex
+        # Log the parsing failure
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"ruamel.yaml parse failed in update_frontmatter_fields, using fallback: {e}")
+
+        # Fallback: update fields one by one (uses improved fallback in singular function)
         for field, value in updates.items():
             content = update_frontmatter_field(content, field, value)
         return content

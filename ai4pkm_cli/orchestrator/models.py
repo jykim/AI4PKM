@@ -76,6 +76,10 @@ class AgentDefinition:
     # Agent-specific parameters from orchestrator.yaml
     agent_params: Dict[str, Any] = field(default_factory=dict)
 
+    # Human-readable worker label (e.g., "Gemini", "ChatGPT")
+    # Set by _create_worker_agent_variant() from WorkerConfig.label
+    worker_label: Optional[str] = None
+
 
 @dataclass
 class ExecutionContext:
