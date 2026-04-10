@@ -27,9 +27,16 @@ from .trigger_agent import trigger_orchestrator_agent
     type=str,
     help="Path to a settings JSON file or a JSON string for Claude Code (passed as --settings to claude CLI)",
 )
+@click.option(
+    "--no-session-persistence",
+    "no_session_persistence",
+    is_flag=True,
+    default=None,
+    help="Pass --no-session-persistence to the Claude CLI (disables session storage on disk)",
+)
 @click.option("--file", "input_file", default=None, help="Input file path to pass to the agent (relative to vault root).")
 @click.pass_context
-def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings, input_file):
+def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings, no_session_persistence, input_file):
     """Trigger an orchestrator agent.
 
     If AGENT abbreviation is provided, triggers that agent directly.
@@ -47,5 +54,8 @@ def trigger_cli(ctx, agent, config_file, mcp_config, claude_settings, input_file
     combined_mcp_config = parent_mcp_config + mcp_config if mcp_config else parent_mcp_config
     # Use local --claude-settings if provided, otherwise fall back to parent context
     effective_claude_settings = claude_settings or (ctx.obj.get("claude_settings") if ctx.obj else None)
-    trigger_orchestrator_agent(abbreviation=agent, config_file=effective_config_file, working_dir=working_dir, mcp_config=combined_mcp_config, claude_settings=effective_claude_settings, input_file=input_file)
+    # Use local --no-session-persistence if provided, otherwise fall back to parent context
+    parent_nsp = ctx.obj.get("no_session_persistence") if ctx.obj else False
+    effective_no_session_persistence = no_session_persistence if no_session_persistence is not None else bool(parent_nsp)
+    trigger_orchestrator_agent(abbreviation=agent, config_file=effective_config_file, working_dir=working_dir, mcp_config=combined_mcp_config, claude_settings=effective_claude_settings, input_file=input_file, no_session_persistence=effective_no_session_persistence)
 

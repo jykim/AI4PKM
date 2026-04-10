@@ -12,7 +12,7 @@ from ..logger import Logger
 logger = Logger(console_output=True)
 
 
-def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None, mcp_config: tuple = None, claude_settings: str = None):
+def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, working_dir: str = None, config_file: Path = None, mcp_config: tuple = None, claude_settings: str = None, no_session_persistence: bool = False):
     """
     Run orchestrator in daemon mode.
 
@@ -46,7 +46,8 @@ def run_orchestrator_daemon(vault_path: Path = None, debug: bool = False, workin
         config=config,
         working_dir=Path(working_dir) if working_dir else None,
         mcp_config=mcp_config,
-        claude_settings=claude_settings
+        claude_settings=claude_settings,
+        no_session_persistence=no_session_persistence
     )
 
     # Setup signal handlers
@@ -151,7 +152,8 @@ def execute_prompt_with_session(
     working_dir: str = None,
     config_file: Path = None,
     mcp_config: tuple = None,
-    claude_settings: str = None
+    claude_settings: str = None,
+    no_session_persistence: bool = False
 ):
     """
     Execute a one-time prompt with Claude agent and optional session ID.
@@ -188,9 +190,10 @@ def execute_prompt_with_session(
         config=config,
         working_dir=Path(working_dir) if working_dir else None,
         mcp_config=mcp_config,
-        claude_settings=claude_settings
+        claude_settings=claude_settings,
+        no_session_persistence=no_session_persistence
     )
-    
+
     # Execute prompt
     start_time = time.time()
     ctx = orch.execute_prompt_with_session(
