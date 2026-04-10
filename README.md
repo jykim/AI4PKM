@@ -1,50 +1,81 @@
-This repo contains Starter PKM setup (i.e. Obsidian Vault) for AI4PKM project.
-- [[PKM Guidelines]] document contains the thinking behind AI4PKM project.
-- Read Jin's [PKM in AI Era](https://publish.obsidian.md/lifidea/Publish/PKM+in+AI+Era/0.+Why+PKM+now%3F) series for more tutorials.
+# AI4PKM CLI
 
-## Directory Structure
+A command-line interface for automating personal knowledge management workflows using AI agents. The CLI provides scheduled prompt execution, multi-agent orchestration, and seamless integration with Claude, Gemini, and Codex.
 
-- `_Archive_/` - Archived content that's no longer active
-- `_Inbox_/` - Temporary storage for unprocessed information
-- `_Settings_/` - Vault configuration, prompts, templates, and workflows
-- `AI/` - AI-generated insights and research
-- `Ingest/` - Incoming information from various sources
-- `Journal/` - Personal reflections and daily notes
-- `Projects/` - Active project documentation
-- `Publish/` - Content ready for publication
-- `Topics/` - Organized knowledge by subject
+> **Looking for the Obsidian Vault?** The starter PKM vault (templates, workflows, prompts) is in a separate repo: [jykim/ai4pkm-vault](https://github.com/jykim/ai4pkm-vault)
 
-## Getting Started
+## Features
 
-1. **Explore Community Plugins**: 
-   Open Obsidian settings and explore the pre-configured community plugins
-2. **Configure Daily Notes**: 
-   The daily notes plugin is pre-configured to use the Journal folder
-3. **Explore Templates**: 
-   Check `_Settings_/Templates/` for note templates
-4. **Review Workflows**: 
-   Browse `_Settings_/Workflows/` for AI-assisted workflows
-5. **Review Prompts**: 
-   Browse `_Settings_/Prompts/` for prompts powering the workflows
+- **Multi-Agent Orchestrator**: Config-driven system that monitors vault files and triggers AI agents automatically
+- **Cron Job Scheduling**: Automated execution of recurring knowledge management tasks
+- **Multiple AI Agents**: Standardized interface to call Claude Code, Gemini CLI, and Codex CLI
+- **Vault Template Management**: Bootstrap new vaults from pre-configured templates
+- **Self-Update**: Keep the CLI up to date with `ai4pkm update`
 
-## AI Integration
-This vault is optimized for AI integration with:
-- Claude Code configuration in [[CLAUDE]]
-- Gemini CLI configuration in [[GEMINI]]
-- Codex CLI configuration in [[AGENTS]]
-- Cursor IDE rules in `.cursor/rules/`
+## Installation
 
-## AI4PKM CLI
-For automated execution, use [[README_CLI|CLI Tool]] provided as python package.
+### Prerequisites
+- Python 3.8 or higher
 
-## Community Plugins
-The following plugins are recommended and pre-configured:
-- Calendar - Visual calendar interface
-- Recent Files - Quick access to recent files
-- Style Settings - Customize appearance
-- Excalidraw - Diagramming and sketching
-- Dataview - Query and display data
-- Templater - Advanced templating
-- Tasks - Task management
-- And more...
+### Install as Package
 
+```bash
+pip install -e .
+```
+
+After installation, the CLI is available as the `ai4pkm` command.
+
+## Quick Start
+
+```bash
+# Show current configuration and usage
+ai4pkm
+
+# Start the multi-agent orchestrator
+ai4pkm -o
+
+# Execute a prompt directly
+ai4pkm -p "What are the key topics in my vault this week?"
+
+# Use a specific agent for one prompt
+ai4pkm -a gemini -p "Translate this to Korean: Hello world"
+
+# Start cron scheduler for recurring tasks
+ai4pkm -c
+
+# Trigger a specific agent manually
+ai4pkm trigger EIC
+
+# Install a starter vault
+ai4pkm template install ai4pkm ~/my-vault
+
+# Update CLI to latest version
+ai4pkm update
+```
+
+## Configuration
+
+The CLI uses configuration files in the `_Settings_/` directory:
+
+| Path | Purpose |
+|------|---------|
+| `_Settings_/Prompts/` | Prompt definitions for agents |
+| `_Settings_/Tasks/` | Task tracking files |
+| `_Settings_/Skills/` | Agent skill definitions |
+| `_Settings_/Bases/` | Base configurations |
+| `_Settings_/Logs/` | Execution logs |
+| `orchestrator.yaml` | Multi-agent orchestrator config |
+| `cron.json` | Scheduled task definitions |
+
+## Documentation
+
+See [docs/](docs/) for detailed documentation:
+- [CLI Tool Reference](docs/cli_tool.md) - Full command reference and examples
+- [Orchestrator Guide](docs/orchestrator.md) - Multi-agent orchestrator setup
+- [Workflows](docs/workflows.md) - AI-assisted workflow patterns
+- [Prompts](docs/prompts.md) - Prompt system documentation
+
+## Related
+
+- [ai4pkm-vault](https://github.com/jykim/ai4pkm-vault) - Starter Obsidian vault for AI4PKM
+- Read Jin's [PKM in AI Era](https://publish.obsidian.md/lifidea/Publish/PKM+in+AI+Era/0.+Why+PKM+now%3F) series for tutorials
