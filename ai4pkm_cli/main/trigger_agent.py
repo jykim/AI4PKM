@@ -10,7 +10,7 @@ from ..orchestrator.core import Orchestrator
 
 logger = Logger(console_output=True)
 
-def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=None, mcp_config=None, claude_settings=None, input_file=None):
+def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=None, mcp_config=None, claude_settings=None, input_file=None, no_session_persistence=False):
     """Trigger an orchestrator agent or poller interactively.
 
     Args:
@@ -20,6 +20,7 @@ def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=
         mcp_config: Optional tuple of MCP config JSON files or strings
         claude_settings: Optional path or JSON string for Claude --settings flag
         input_file: Optional input file path to pass to the agent
+        no_session_persistence: If True, pass --no-session-persistence to Claude CLI
     """
     try:
         config = Config(config_file=config_file)
@@ -30,7 +31,8 @@ def trigger_orchestrator_agent(abbreviation=None, config_file=None, working_dir=
             config=config,
             working_dir=Path(working_dir) if working_dir else None,
             mcp_config=mcp_config,
-            claude_settings=claude_settings
+            claude_settings=claude_settings,
+            no_session_persistence=no_session_persistence
         )
 
         agents_list = [agent for agent in orch.agent_registry.agents.values()]

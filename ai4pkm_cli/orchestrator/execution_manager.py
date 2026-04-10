@@ -30,7 +30,7 @@ class ExecutionManager:
     Each agent can specify max_parallel limit.
     """
 
-    def __init__(self, vault_path: Path, max_concurrent: int = 3, config: Optional['Config'] = None, orchestrator_settings: Optional[dict] = None, working_dir: Optional[Path] = None, mcp_config: Optional[tuple] = None, claude_settings: Optional[str] = None):
+    def __init__(self, vault_path: Path, max_concurrent: int = 3, config: Optional['Config'] = None, orchestrator_settings: Optional[dict] = None, working_dir: Optional[Path] = None, mcp_config: Optional[tuple] = None, claude_settings: Optional[str] = None, no_session_persistence: bool = False):
         """
         Initialize execution manager.
 
@@ -42,6 +42,7 @@ class ExecutionManager:
             working_dir: Working directory for agent subprocess execution (defaults to vault_path)
             mcp_config: Optional tuple of MCP config JSON files or strings
             claude_settings: Optional path or JSON string for Claude --settings flag
+            no_session_persistence: If True, pass --no-session-persistence to Claude CLI
         """
         from ..config import Config
 
@@ -52,6 +53,7 @@ class ExecutionManager:
         self.orchestrator_settings = orchestrator_settings or {}
         self.mcp_config = mcp_config
         self.claude_settings = claude_settings
+        self.no_session_persistence = no_session_persistence
 
         # Instance-level state (no global state)
         self._running_count = 0
@@ -324,6 +326,8 @@ class ExecutionManager:
         
         # Build command with optional session ID (prompt will be passed via stdin)
         cmd = ['claude', '--permission-mode', 'bypassPermissions', '--print']
+        if self.no_session_persistence:
+            cmd.append('--no-session-persistence')
         
         if ctx.system_prompt_file:
             cmd.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
@@ -367,7 +371,10 @@ class ExecutionManager:
                 logger.info(f"Session {ctx.session_id} already exists, resuming...")
                 # Clear previous error
                 ctx.error_message = None
-                cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print', '--resume', ctx.session_id]
+                cmd_resume = ['claude', '--permission-mode', 'bypassPermissions', '--print']
+                if self.no_session_persistence:
+                    cmd_resume.append('--no-session-persistence')
+                cmd_resume.extend(['--resume', ctx.session_id])
                 if ctx.system_prompt_file:
                     cmd_resume.extend(['--system-prompt-file', str(ctx.system_prompt_file)])
                 # Add system prompt to resume command

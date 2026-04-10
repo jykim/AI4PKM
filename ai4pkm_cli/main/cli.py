@@ -107,6 +107,12 @@ def signal_handler(sig, frame):
     type=str,
     help="Path to a settings JSON file or a JSON string for Claude Code (passed as --settings to claude CLI)",
 )
+@click.option(
+    "--no-session-persistence",
+    "no_session_persistence",
+    is_flag=True,
+    help="Pass --no-session-persistence to the Claude CLI (disables session storage on disk)",
+)
 @click.pass_context
 def main(
     ctx,
@@ -125,6 +131,7 @@ def main(
     session_id,
     mcp_config,
     claude_settings,
+    no_session_persistence,
 ):
     """PKM CLI - Personal Knowledge Management framework."""
     # Set up signal handler for graceful shutdown
@@ -142,6 +149,7 @@ def main(
     ctx.obj["debug"] = debug
     ctx.obj["mcp_config"] = mcp_config
     ctx.obj["claude_settings"] = claude_settings
+    ctx.obj["no_session_persistence"] = no_session_persistence
 
     # If a subcommand was invoked, let it handle execution
     if ctx.invoked_subcommand is not None:
@@ -151,7 +159,7 @@ def main(
     if orchestrator_status:
         show_orchestrator_status(working_dir=working_dir, config_file=config_file)
     elif orchestrator:
-        run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file, mcp_config=mcp_config, claude_settings=claude_settings)
+        run_orchestrator_daemon(debug=debug, working_dir=working_dir, config_file=config_file, mcp_config=mcp_config, claude_settings=claude_settings, no_session_persistence=no_session_persistence)
     elif prompt_text:
         execute_prompt_with_session(
             prompt=prompt_text,
@@ -163,7 +171,8 @@ def main(
             append_system_prompt=append_system_prompt,
             append_system_prompt_file=append_system_prompt_file,
             mcp_config=mcp_config,
-            claude_settings=claude_settings
+            claude_settings=claude_settings,
+            no_session_persistence=no_session_persistence
         )
     elif list_agents:
         list_agents_handler()

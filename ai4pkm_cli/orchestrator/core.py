@@ -35,6 +35,7 @@ class Orchestrator:
         config: Optional['Config'] = None,
         mcp_config: Optional[tuple] = None,
         claude_settings: Optional[str] = None,
+        no_session_persistence: bool = False,
     ):
         """
         Initialize orchestrator.
@@ -48,6 +49,7 @@ class Orchestrator:
             config: Config instance (will create default if None)
             mcp_config: Optional tuple of MCP config JSON files or strings
             claude_settings: Optional path or JSON string for Claude --settings flag
+            no_session_persistence: If True, pass --no-session-persistence to Claude CLI
         """
         from ..config import Config
         from datetime import datetime
@@ -56,6 +58,7 @@ class Orchestrator:
         self.config = config or Config()
         self.mcp_config = mcp_config
         self.claude_settings = claude_settings
+        self.no_session_persistence = no_session_persistence
 
         # Use config values if not explicitly provided
         if agents_dir is None:
@@ -79,7 +82,8 @@ class Orchestrator:
             orchestrator_settings=self.agent_registry.orchestrator_settings,
             working_dir=working_dir,
             mcp_config=mcp_config,
-            claude_settings=claude_settings
+            claude_settings=claude_settings,
+            no_session_persistence=no_session_persistence
         )
         # Get file_extensions from orchestrator_settings (default to ['.md'] if not specified)
         file_extensions = self.agent_registry.orchestrator_settings.get('file_extensions', ['.md'])
