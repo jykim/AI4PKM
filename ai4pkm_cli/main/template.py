@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Template management commands for AI4PKM CLI."""
 
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -11,12 +12,21 @@ from typing import Optional
 import click
 import requests
 
-# Template registry: maps template names to GitHub repos and vault folders
+# Template registry: maps template names to GitHub repos and vault folders.
+# source_type: "release" downloads the latest GitHub release zip;
+# "git" clones the repo (use for repos without releases).
 TEMPLATE_REGISTRY = {
     "ai4pkm": {
         "repo": "jykim/ai4pkm-vault",
         "description": "AI4PKM starter vault with default configuration",
         "vault_folder": ".",
+        "source_type": "release",
+    },
+    "cmds": {
+        "repo": "johnfkoo951/cmds-vault",
+        "description": "Commands vault from johnfkoo951/cmds-vault",
+        "vault_folder": ".",
+        "source_type": "git",
     },
 }
 
@@ -67,6 +77,29 @@ def download_zip(url: str, dest_path: Path) -> None:
                 click.echo(f"\rProgress: {percent}%", nl=False)
     
     click.echo("\nDownload complete.")
+
+
+def clone_repo(repo: str, dest_dir: Path, ref: Optional[str] = None) -> Path:
+    """Clone a GitHub repo into dest_dir and return the clone path."""
+    url = f"https://github.com/{repo}.git"
+    click.echo(f"Cloning {url}...")
+
+    cmd = ["git", "clone", "--depth", "1"]
+    if ref:
+        cmd += ["--branch", ref]
+    cmd += [url, str(dest_dir)]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"git clone failed: {result.stderr.strip()}")
+
+    # Drop the .git directory so the target vault is not a git repo.
+    git_dir = dest_dir / ".git"
+    if git_dir.exists():
+        shutil.rmtree(git_dir)
+
+    click.echo("Clone complete.")
+    return dest_dir
 
 
 def extract_zip(zip_path: Path, dest_dir: Path) -> Path:
@@ -125,6 +158,7 @@ def list_templates():
         click.echo(f"  {name}")
         click.echo(f"    Description: {info['description']}")
         click.echo(f"    Repository:  https://github.com/{info['repo']}")
+        click.echo(f"    Source:      {info.get('source_type', 'release')}")
         click.echo()
     
     click.echo("Use 'ai4pkm template install <name> <target_dir>' to install.")
@@ -147,7 +181,8 @@ def install_template(template_name: str, target_dir: Path, force: bool, target_v
     
     template_info = TEMPLATE_REGISTRY[template_name]
     repo = template_info["repo"]
-    
+    source_type = template_info.get("source_type", "release")
+
     target_dir = target_dir.resolve()
     if target_dir.exists():
         if any(target_dir.iterdir()):
@@ -157,8 +192,34 @@ def install_template(template_name: str, target_dir: Path, force: bool, target_v
             click.echo(f"Warning: Overwriting files in '{target_dir}'...")
     else:
         target_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Get release
+
+    if source_type == "git":
+        version_label = target_version or "default branch"
+        click.echo("=" * 50)
+        click.echo(f"Installing template: {template_name}")
+        click.echo(f"Source: git clone ({version_label})")
+        click.echo(f"Target: {target_dir}")
+        click.echo("=" * 50)
+        click.echo()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            clone_dir = tmpdir_path / "repo"
+
+            try:
+                clone_repo(repo, clone_dir, ref=target_version)
+            except (FileNotFoundError, RuntimeError) as e:
+                click.echo(f"Clone failed: {e}", err=True)
+                sys.exit(1)
+
+            if copy_vault_folder(clone_dir, template_info["vault_folder"], target_dir):
+                _print_success(target_dir)
+            else:
+                click.echo("Installation failed.", err=True)
+                sys.exit(1)
+        return
+
+    # source_type == "release"
     if target_version:
         release = get_release_by_tag(repo, target_version)
         if not release:
@@ -169,50 +230,54 @@ def install_template(template_name: str, target_dir: Path, force: bool, target_v
         if not release:
             click.echo("Error: No releases available.", err=True)
             sys.exit(1)
-    
+
     zip_url = release.get("zipball_url")
     release_tag = release.get("tag_name", "unknown")
-    
+
     if not zip_url:
         click.echo("Error: No download URL found.", err=True)
         sys.exit(1)
-    
+
     click.echo("=" * 50)
     click.echo(f"Installing template: {template_name}")
     click.echo(f"Version: {release_tag}")
     click.echo(f"Target: {target_dir}")
     click.echo("=" * 50)
     click.echo()
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         zip_path = tmpdir_path / "template.zip"
-        
+
         try:
             download_zip(zip_url, zip_path)
             extracted_path = extract_zip(zip_path, tmpdir_path)
-            
+
             if copy_vault_folder(extracted_path, template_info["vault_folder"], target_dir):
-                click.echo()
-                click.echo("=" * 50)
-                click.echo("Template installed successfully!")
-                click.echo(f"Vault ready at: {target_dir}")
-                click.echo()
-                click.echo("Next steps:")
-                click.echo("  1. Open the folder in Obsidian")
-                click.echo("  2. Trust the vault when prompted")
-                click.echo("  3. Explore _Settings_ for configuration")
-                click.echo("=" * 50)
+                _print_success(target_dir)
             else:
                 click.echo("Installation failed.", err=True)
                 sys.exit(1)
-                
+
         except requests.RequestException as e:
             click.echo(f"Download failed: {e}", err=True)
             sys.exit(1)
         except zipfile.BadZipFile as e:
             click.echo(f"Extraction failed: {e}", err=True)
             sys.exit(1)
+
+
+def _print_success(target_dir: Path) -> None:
+    click.echo()
+    click.echo("=" * 50)
+    click.echo("Template installed successfully!")
+    click.echo(f"Vault ready at: {target_dir}")
+    click.echo()
+    click.echo("Next steps:")
+    click.echo("  1. Open the folder in Obsidian")
+    click.echo("  2. Trust the vault when prompted")
+    click.echo("  3. Explore _Settings_ for configuration")
+    click.echo("=" * 50)
 
 
 if __name__ == "__main__":
