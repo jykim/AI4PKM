@@ -220,7 +220,8 @@ ai4pkm template install ai4pkm ~/my-vault --force
 ```
 
 **Available Templates:**
-- **ai4pkm**: AI4PKM starter vault with default configuration (from [ai4pkm-vault](https://github.com/jykim/ai4pkm-vault))
+- **ai4pkm**: AI4PKM starter vault with default configuration (from [ai4pkm-vault](https://github.com/jykim/ai4pkm-vault), GitHub releases)
+- **cmds**: Commands vault from [cmds-vault](https://github.com/johnfkoo951/cmds-vault) (cloned via `git clone`; `--version` selects a branch/tag)
 
 ---
 
