@@ -28,6 +28,12 @@ TEMPLATE_REGISTRY = {
         "vault_folder": ".",
         "source_type": "git",
     },
+    "gobi-desktop": {
+        "repo": "gpminsuk/gobi-desktop-vault",
+        "description": "Gobi desktop vault",
+        "vault_folder": ".",
+        "source_type": "git",
+    }
 }
 
 
