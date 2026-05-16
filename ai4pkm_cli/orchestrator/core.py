@@ -121,19 +121,19 @@ class Orchestrator:
         logger.info(f"Loaded {len(self.poller_manager.pollers)} poller(s)")
 
     def _ensure_directories(self):
-        """Create orchestrator directories if they don't exist."""
-        # Get all configured directories from orchestrator_settings if available
-        # This method is called before agent_registry is initialized, so use config as fallback
+        """Create orchestrator directories explicitly configured in orchestrator.yaml.
+
+        Only paths declared under the `orchestrator:` section with keys ending in
+        `_dir` are created. Nothing is pre-created from hard-coded defaults.
+        """
+        orchestrator_section = self.config.get_orchestrator_config()
         directories = [
-            self.config.get_orchestrator_prompts_dir(),
-            self.config.get_orchestrator_tasks_dir(),
-            self.config.get_orchestrator_logs_dir(),
-            self.config.get('orchestrator.skills_dir', '_Settings_/Skills'),
-            self.config.get('orchestrator.bases_dir', '_Settings_/Bases'),
+            value
+            for key, value in orchestrator_section.items()
+            if key.endswith("_dir") and isinstance(value, str) and value
         ]
 
         created = []
-        # Create each directory
         for dir_path in directories:
             full_path = self.vault_path / dir_path
             if not full_path.exists():
