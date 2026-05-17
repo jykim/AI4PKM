@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Template management commands for AI4PKM CLI."""
 
+import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -11,6 +13,18 @@ from typing import Optional
 
 import click
 import requests
+
+
+def _rmtree(path: Path) -> None:
+    """rmtree that survives read-only files (git pack files, etc)."""
+    def _on_error(func, target, _exc_info):
+        try:
+            os.chmod(target, stat.S_IWRITE)
+            func(target)
+        except OSError:
+            pass
+
+    shutil.rmtree(path, onerror=_on_error)
 
 # Template registry: maps template names to GitHub repos and vault folders.
 # source_type: "release" downloads the latest GitHub release zip;
@@ -102,7 +116,7 @@ def clone_repo(repo: str, dest_dir: Path, ref: Optional[str] = None) -> Path:
     # Drop the .git directory so the target vault is not a git repo.
     git_dir = dest_dir / ".git"
     if git_dir.exists():
-        shutil.rmtree(git_dir)
+        _rmtree(git_dir)
 
     click.echo("Clone complete.")
     return dest_dir
@@ -138,7 +152,7 @@ def copy_vault_folder(source_dir: Path, vault_folder: str, target_dir: Path) -> 
         dest = target_dir / item.name
         if item.is_dir():
             if dest.exists():
-                shutil.rmtree(dest)
+                _rmtree(dest)
             shutil.copytree(item, dest)
         else:
             shutil.copy2(item, dest)
