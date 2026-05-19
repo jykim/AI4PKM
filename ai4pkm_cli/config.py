@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import yaml
 from .logger import Logger
+
+if TYPE_CHECKING:
+    from .config_validator import ValidationResult
 
 logger = Logger()
 
@@ -85,10 +88,13 @@ class Config:
 
         return config_data
 
-    def reload(self) -> bool:
+    def reload(self, validate: bool = True) -> bool:
         """
         Reload orchestrator.yaml and secrets.yaml from disk.
-        
+
+        Args:
+            validate: If True, run validation after reload and log issues
+
         Returns:
             True if reload succeeded, False otherwise
         """
@@ -97,6 +103,15 @@ class Config:
             if new_config:
                 self.config = new_config
                 logger.info(f"Configuration reloaded from {self.config_path}")
+
+                # Run validation if requested
+                if validate:
+                    result = self.validate()
+                    if not result.valid:
+                        logger.warning(f"Configuration has validation errors:\n{result.summary()}")
+                    elif result.warnings:
+                        logger.info(f"Configuration warnings:\n{result.summary()}")
+
                 return True
             else:
                 logger.warning("Reload resulted in empty config, keeping existing config")
@@ -104,6 +119,22 @@ class Config:
         except Exception as e:
             logger.error(f"Failed to reload configuration: {e}", exc_info=True)
             return False
+
+    def validate(self) -> "ValidationResult":
+        """
+        Validate the current configuration.
+
+        Checks for:
+        - Missing required fields
+        - Unknown/unused fields (typos, deprecated)
+        - Type validation
+        - Enum value validation
+
+        Returns:
+            ValidationResult with all issues found
+        """
+        from .config_validator import validate_config
+        return validate_config(self.config)
 
     # --------------------------------------------------------------------- #
     # Public accessors
