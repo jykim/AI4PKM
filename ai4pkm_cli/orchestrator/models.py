@@ -54,6 +54,11 @@ class AgentDefinition:
     # Post-processing
     post_process_action: Optional[str] = None  # e.g., "remove_trigger_content"
 
+    # File-change retry (re-execute if input modified after execution exits)
+    retry: bool = False              # Enable file-change retry
+    retry_max: int = 20              # Max retry attempts (0 = unlimited)
+    retry_watch_seconds: int = 5     # Seconds to watch for post-exit file changes
+
     # Logging
     log_prefix: str = ""
     log_pattern: str = "{timestamp}-{agent}.log"
