@@ -1,0 +1,508 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai4pkm.dev/schemas/orchestrator.schema.json",
+  "title": "AI4PKM Orchestrator Configuration",
+  "description": "Schema for orchestrator.yaml configuration file",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration version"
+    },
+    "name": {
+      "type": "string",
+      "description": "Vault display name"
+    },
+    "id": {
+      "type": "string",
+      "description": "Vault identifier"
+    },
+    "description": {
+      "type": "string",
+      "description": "Vault description"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Vault icon"
+    },
+    "color": {
+      "type": "string",
+      "description": "Vault color"
+    },
+    "orchestrator": {
+      "$ref": "#/$defs/orchestrator"
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults"
+    },
+    "nodes": {
+      "type": "array",
+      "description": "List of agent nodes",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "pollers": {
+      "$ref": "#/$defs/pollers"
+    }
+  },
+  "$defs": {
+    "executor": {
+      "type": "string",
+      "enum": ["claude_code", "gemini_cli", "codex_cli", "cursor_agent", "continue_cli", "grok_cli"],
+      "description": "Agent executor type"
+    },
+    "taskPriority": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Task priority level"
+    },
+    "orchestrator": {
+      "type": "object",
+      "description": "Orchestrator settings",
+      "additionalProperties": false,
+      "properties": {
+        "prompts_dir": {
+          "type": "string",
+          "description": "Directory for prompt files"
+        },
+        "tasks_dir": {
+          "type": "string",
+          "description": "Directory for task files"
+        },
+        "logs_dir": {
+          "type": "string",
+          "description": "Directory for log files"
+        },
+        "skills_dir": {
+          "type": "string",
+          "description": "Directory for skill files"
+        },
+        "bases_dir": {
+          "type": "string",
+          "description": "Directory for base files"
+        },
+        "max_concurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum concurrent tasks"
+        },
+        "poll_interval": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Polling interval in seconds"
+        },
+        "mode": {
+          "type": "string",
+          "description": "Operating mode"
+        },
+        "ambient_mode": {
+          "type": "boolean",
+          "description": "Enable ambient mode"
+        },
+        "system_prompt": {
+          "type": "string",
+          "description": "System prompt for voice mode"
+        },
+        "orchestrator_language": {
+          "type": "string",
+          "description": "Language for orchestrator output"
+        },
+        "stt_provider": {
+          "type": "string",
+          "description": "Speech-to-text provider"
+        },
+        "stt_language": {
+          "type": "string",
+          "description": "Speech-to-text language"
+        },
+        "tts_provider": {
+          "type": "string",
+          "description": "Text-to-speech provider"
+        },
+        "mic_gain": {
+          "type": "number",
+          "description": "Microphone gain"
+        },
+        "manual_end_detection": {
+          "type": "boolean",
+          "description": "Enable manual end detection"
+        },
+        "wakeword_enabled": {
+          "type": "boolean",
+          "description": "Enable wakeword detection"
+        },
+        "wakeword_mode": {
+          "type": "string",
+          "description": "Wakeword detection mode"
+        },
+        "periodic_processing": {
+          "type": "boolean",
+          "description": "Enable periodic processing"
+        },
+        "periodic_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Periodic processing interval in seconds"
+        },
+        "periodic_prompt": {
+          "type": "string",
+          "description": "Prompt for periodic processing"
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default settings for nodes",
+      "additionalProperties": false,
+      "properties": {
+        "executor": {
+          "$ref": "#/$defs/executor"
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Default timeout in minutes"
+        },
+        "max_parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum parallel executions"
+        },
+        "task_create": {
+          "type": "boolean",
+          "description": "Create task files by default"
+        },
+        "task_priority": {
+          "$ref": "#/$defs/taskPriority"
+        },
+        "task_archived": {
+          "type": "boolean",
+          "description": "Archive tasks by default"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "description": "Agent node configuration",
+      "additionalProperties": false,
+      "required": ["type", "name"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Node type"
+        },
+        "name": {
+          "type": "string",
+          "description": "Node name (used for prompt lookup)"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable/disable this node"
+        },
+        "completion_status": {
+          "type": "string",
+          "description": "Node completion state"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Custom prompt (overrides name-based lookup)"
+        },
+        "input_path": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Input path(s) to watch"
+        },
+        "input_type": {
+          "type": "string",
+          "enum": ["new_file", "updated_file", "daily_file", "manual"],
+          "description": "Type of input trigger"
+        },
+        "input_pattern": {
+          "type": "string",
+          "description": "Glob pattern for input files"
+        },
+        "output_path": {
+          "type": "string",
+          "description": "Output directory path"
+        },
+        "output_type": {
+          "type": "string",
+          "enum": ["new_file", "update_file", ""],
+          "description": "Type of output"
+        },
+        "output_naming": {
+          "type": "string",
+          "description": "Output file naming pattern"
+        },
+        "cron": {
+          "type": "string",
+          "description": "Cron expression for scheduling"
+        },
+        "trigger_exclude_pattern": {
+          "type": "string",
+          "description": "Pattern to exclude from triggers"
+        },
+        "trigger_content_pattern": {
+          "type": "string",
+          "description": "Content pattern to match for triggers"
+        },
+        "trigger_schedule": {
+          "type": "string",
+          "description": "Schedule-based trigger"
+        },
+        "trigger_wait_for": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Wait for other nodes to complete"
+        },
+        "skills": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Skills to enable"
+        },
+        "mcp_servers": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "MCP servers to enable"
+        },
+        "executor": {
+          "$ref": "#/$defs/executor"
+        },
+        "max_parallel": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum parallel executions for this node"
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Timeout in minutes"
+        },
+        "task_create": {
+          "type": "boolean",
+          "description": "Create task file"
+        },
+        "task_priority": {
+          "$ref": "#/$defs/taskPriority"
+        },
+        "task_archived": {
+          "type": "boolean",
+          "description": "Archive task after completion"
+        },
+        "post_process_action": {
+          "type": "string",
+          "description": "Action to perform after processing"
+        },
+        "agent_params": {
+          "type": "object",
+          "description": "Additional agent parameters"
+        },
+        "log_prefix": {
+          "type": "string",
+          "description": "Prefix for log entries"
+        },
+        "log_pattern": {
+          "type": "string",
+          "description": "Pattern for log file naming"
+        },
+        "version": {
+          "type": "string",
+          "description": "Node version"
+        },
+        "workers": {
+          "type": "array",
+          "description": "Worker configurations",
+          "items": {
+            "$ref": "#/$defs/worker"
+          }
+        }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "description": "Worker configuration within a node",
+      "additionalProperties": false,
+      "required": ["executor", "label"],
+      "properties": {
+        "executor": {
+          "$ref": "#/$defs/executor"
+        },
+        "label": {
+          "type": "string",
+          "description": "Worker label"
+        },
+        "output_path": {
+          "type": "string",
+          "description": "Output path for this worker"
+        },
+        "agent_params": {
+          "type": "object",
+          "description": "Additional agent parameters"
+        }
+      }
+    },
+    "pollers": {
+      "type": "object",
+      "description": "Poller configurations",
+      "additionalProperties": false,
+      "properties": {
+        "apple_photos": {
+          "$ref": "#/$defs/pollerApplePhotos"
+        },
+        "apple_notes": {
+          "$ref": "#/$defs/pollerAppleNotes"
+        },
+        "gobi": {
+          "$ref": "#/$defs/pollerGobi"
+        },
+        "gobi_by_tags": {
+          "$ref": "#/$defs/pollerGobiByTags"
+        },
+        "limitless": {
+          "$ref": "#/$defs/pollerLimitless"
+        }
+      }
+    },
+    "pollerCommon": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable this poller"
+        },
+        "target_dir": {
+          "type": "string",
+          "description": "Target directory for synced files"
+        },
+        "poll_interval": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Polling interval in seconds"
+        }
+      }
+    },
+    "pollerApplePhotos": {
+      "type": "object",
+      "description": "Apple Photos poller configuration",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/pollerCommon" }],
+      "properties": {
+        "enabled": true,
+        "target_dir": true,
+        "poll_interval": true,
+        "days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of days to sync"
+        },
+        "albums": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific albums to sync"
+        }
+      }
+    },
+    "pollerAppleNotes": {
+      "type": "object",
+      "description": "Apple Notes poller configuration",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/pollerCommon" }],
+      "properties": {
+        "enabled": true,
+        "target_dir": true,
+        "poll_interval": true
+      }
+    },
+    "pollerGobi": {
+      "type": "object",
+      "description": "Gobi poller configuration",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/pollerCommon" }],
+      "properties": {
+        "enabled": true,
+        "target_dir": true,
+        "poll_interval": true,
+        "api_base_url": {
+          "type": "string",
+          "description": "Gobi API endpoint"
+        },
+        "api_key": {
+          "type": "string",
+          "description": "API key"
+        },
+        "local_timezone": {
+          "type": "string",
+          "description": "Timezone for timestamps"
+        }
+      }
+    },
+    "pollerGobiByTags": {
+      "type": "object",
+      "description": "Gobi by tags poller configuration",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/pollerCommon" }],
+      "properties": {
+        "enabled": true,
+        "target_dir": true,
+        "poll_interval": true,
+        "api_base_url": {
+          "type": "string",
+          "description": "Gobi API endpoint"
+        },
+        "api_key": {
+          "type": "string",
+          "description": "API key"
+        },
+        "admin_api_key": {
+          "type": "string",
+          "description": "Admin API key for tag queries"
+        },
+        "local_timezone": {
+          "type": "string",
+          "description": "Timezone for timestamps"
+        },
+        "tags": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ],
+          "description": "Tags to filter"
+        }
+      }
+    },
+    "pollerLimitless": {
+      "type": "object",
+      "description": "Limitless poller configuration",
+      "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/pollerCommon" }],
+      "properties": {
+        "enabled": true,
+        "target_dir": true,
+        "poll_interval": true,
+        "start_days_ago": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many days back to sync"
+        },
+        "local_timezone": {
+          "type": "string",
+          "description": "Timezone for timestamps"
+        },
+        "api_key": {
+          "type": "string",
+          "description": "Limitless API key"
+        }
+      }
+    }
+  }
+}
